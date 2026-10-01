@@ -72,7 +72,7 @@ export default function HeroScroll({ image, stats }) {
     };
 
     return (
-        <section id="hero" ref={box} className="relative -mt-16 h-[400vh]">
+        <section id="hero" ref={box} className="relative -mt-24 h-[400vh] bg-neutral-900">
             <div ref={pin} className="sticky top-0 h-svh overflow-hidden bg-neutral-900">
                 <img
                     ref={img}
