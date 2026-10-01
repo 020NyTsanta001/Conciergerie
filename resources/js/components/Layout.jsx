@@ -46,9 +46,33 @@ export default function Layout() {
                 }`}
             >
                 <div className="mx-auto max-w-7xl px-5 h-16 flex items-center justify-between text-sm font-medium">
-                    <Link to="/" className={`text-lg font-semibold tracking-tight ${transparent ? 'text-white' : 'text-neutral-900'}`}>
-                        Maison Élite
+                    
+                    <Link to="/" className="relative flex items-center h-20 w-48">
+                        {/* 1. LOGO BLANC (Affiché quand transparent est vrai) */}
+                        <img 
+                            src="/images/logo-white.svg" 
+                            alt="Hoxen" 
+                            className={`absolute inset-0 h-full w-auto object-contain transition-opacity duration-300 ease-in-out ${
+                            transparent ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                            }`}
+                            loading="eager"
+                            fetchpriority="high"
+                        /> 
+
+                        {/* 2. LOGO NOIR (Affiché quand transparent est faux / au scroll) */}
+                        <img 
+                            src="/images/logo-black.svg" 
+                            alt="Hoxen" 
+                            className={`absolute inset-0 h-full w-auto object-contain transition-opacity duration-300 ease-in-out ${
+                            transparent ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
+                            }`}
+                            loading="eager"
+                            fetchpriority="high"
+                        /> 
                     </Link>
+
+
+
                     <nav className="hidden md:flex gap-8">
                         <NavLink to="/villas" className={link}>Propriétés</NavLink>
                         {user && <NavLink to="/bookings" className={link}>Réservations</NavLink>}
