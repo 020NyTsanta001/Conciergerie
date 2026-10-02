@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -28,11 +29,16 @@ class AuthController extends Controller
     {
         $credentials = $request->validate(['email' => 'required|email', 'password' => 'required']);
 
-        if (! Auth::attempt($credentials)) {
+        $user = User::where('email', $credentials['email'])->first();
+
+        if (! $user || ! Hash::check($credentials['password'], $user->password)) {
             throw ValidationException::withMessages(['email' => 'Identifiants invalides.']);
         }
+        if ($user->suspended_at) {
+            throw ValidationException::withMessages(['email' => 'Ce compte est suspendu. Contactez un concierge.']);
+        }
 
-        $user = User::where('email', $credentials['email'])->firstOrFail();
+        ActivityLog::record($user, 'login', "s'est connecté");
 
         return ['user' => $user, 'token' => $user->createToken('spa')->plainTextToken];
     }

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth';
+import UserMenu from './UserMenu';
 
 export default function Layout() {
-    const { user, logout } = useAuth();
-    const nav = useNavigate();
+    const { user } = useAuth();
     const { pathname } = useLocation();
     const isHome = pathname === '/';
     const [scrolled, setScrolled] = useState(false);
@@ -46,32 +46,30 @@ export default function Layout() {
                 }`}
             >
                 <div className="mx-auto max-w-7xl px-5 h-16 flex items-center justify-between text-sm font-medium">
-                    
+
                     <Link to="/" className="relative flex items-center h-20 w-48">
-                        {/* 1. LOGO BLANC (Affiché quand transparent est vrai) */}
-                        <img 
-                            src="/images/logo-white.svg" 
-                            alt="Hoxen" 
+                        {/* 1. LOGO BLANC (affiché quand le header est transparent) */}
+                        <img
+                            src="/images/logo-white.svg"
+                            alt="Hoxen"
                             className={`absolute inset-0 h-full w-auto object-contain transition-opacity duration-300 ease-in-out ${
-                            transparent ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                                transparent ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
                             }`}
                             loading="eager"
-                            fetchpriority="high"
-                        /> 
+                            fetchPriority="high"
+                        />
 
-                        {/* 2. LOGO NOIR (Affiché quand transparent est faux / au scroll) */}
-                        <img 
-                            src="/images/logo-black.svg" 
-                            alt="Hoxen" 
+                        {/* 2. LOGO NOIR (affiché au scroll et sur les autres pages) */}
+                        <img
+                            src="/images/logo-black.svg"
+                            alt="Hoxen"
                             className={`absolute inset-0 h-full w-auto object-contain transition-opacity duration-300 ease-in-out ${
-                            transparent ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
+                                transparent ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
                             }`}
                             loading="eager"
-                            fetchpriority="high"
-                        /> 
+                            fetchPriority="high"
+                        />
                     </Link>
-
-
 
                     <nav className="hidden md:flex gap-8">
                         <NavLink to="/villas" className={link}>Propriétés</NavLink>
@@ -79,17 +77,9 @@ export default function Layout() {
                         {user && ['host', 'admin'].includes(user.role) && <NavLink to="/host" className={link}>Mes villas</NavLink>}
                         {user?.role === 'admin' && <NavLink to="/admin" className={link}>Modération</NavLink>}
                     </nav>
+
                     {user ? (
-                        <button
-                            onClick={async () => { await logout(); nav('/'); }}
-                            className={`rounded-full border px-4 py-2 transition-colors ${
-                                transparent
-                                    ? 'border-white/70 text-white hover:bg-white/15'
-                                    : 'border-neutral-300 text-neutral-900 hover:bg-neutral-50'
-                            }`}
-                        >
-                            {user.name.split(' ')[0]} · Déconnexion
-                        </button>
+                        <UserMenu transparent={transparent} />
                     ) : (
                         <Link
                             to="/login"

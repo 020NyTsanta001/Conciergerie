@@ -11,6 +11,7 @@ import Login from './pages/Login';
 import Bookings from './pages/Bookings';
 import Host from './pages/Host';
 import Admin from './pages/Admin';
+import Account from './pages/Account';
 
 function Protected({ roles, children }) {
     const { user, ready } = useAuth();
@@ -32,6 +33,7 @@ createRoot(document.getElementById('root')).render(
                     <Route path="/bookings" element={<Protected><Bookings /></Protected>} />
                     <Route path="/host" element={<Protected roles={['host', 'admin']}><Host /></Protected>} />
                     <Route path="/admin" element={<Protected roles={['admin']}><Admin /></Protected>} />
+                    <Route path="/account" element={<Protected roles={['client', 'host']}><Account /></Protected>} />
                 </Route>
             </Routes>
         </AuthProvider>
