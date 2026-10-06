@@ -13,6 +13,13 @@ export function AuthProvider({ children }) {
         api('/me').then(setUser).catch(() => localStorage.removeItem('token')).finally(() => setReady(true));
     }, []);
 
+    // session invalidée par le serveur : on déconnecte l'interface
+    useEffect(() => {
+        const onExpired = () => setUser(null);
+        window.addEventListener('auth:expired', onExpired);
+        return () => window.removeEventListener('auth:expired', onExpired);
+    }, []);
+
     const authenticate = async (path, body) => {
         const r = await api(path, { method: 'POST', body });
         localStorage.setItem('token', r.token);

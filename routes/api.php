@@ -22,6 +22,7 @@ Route::prefix('v1')->group(function () {
     Route::get('properties', [VillaController::class, 'index']);
     Route::get('properties/{villa}', [VillaController::class, 'show']);
     Route::get('seasons', [VillaController::class, 'seasons']);
+    Route::get('yachts', [VillaController::class, 'yachts']);
     Route::get('services', [ServiceController::class, 'index']);
 
     Route::middleware('auth:sanctum')->group(function () {
@@ -41,7 +42,10 @@ Route::prefix('v1')->group(function () {
         Route::middleware(EnsureRole::class.':host,admin')->prefix('host')->group(function () {
             Route::get('properties', [HostController::class, 'index']);
             Route::post('properties', [HostController::class, 'store']);
+            Route::put('properties/{villa}', [HostController::class, 'update']);
+            Route::delete('properties/{villa}', [HostController::class, 'destroy']);
             Route::put('properties/{villa}/seasons', [HostController::class, 'syncSeasons']);
+            
             
         });
 
@@ -51,6 +55,7 @@ Route::prefix('v1')->group(function () {
             Route::get('users', [AdminUserController::class, 'index']);
             Route::patch('users/{user}/suspend', [AdminUserController::class, 'suspend']);
             Route::get('activity', [AdminActivityController::class, 'index']);
+            Route::delete('properties/{villa}', [AdminController::class, 'destroy']);
         });
     });
 });

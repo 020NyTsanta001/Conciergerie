@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth';
 import UserMenu from './UserMenu';
+import MobileNav from './MobileNav';
 
 export default function Layout() {
     const { user } = useAuth();
@@ -47,7 +48,7 @@ export default function Layout() {
             >
                 <div className="mx-auto max-w-7xl px-5 h-16 flex items-center justify-between text-sm font-medium">
 
-                    <Link to="/" className="relative flex items-center h-20 w-48">
+                    <Link to="/" className="relative flex items-center h-20 w-36 md:w-48">
                         {/* 1. LOGO BLANC (affiché quand le header est transparent) */}
                         <img
                             src="/images/logo-white.svg"
@@ -71,6 +72,7 @@ export default function Layout() {
                         />
                     </Link>
 
+                    {/* Navigation ordinateur (masquée sur mobile) */}
                     <nav className="hidden md:flex gap-8">
                         <NavLink to="/villas" className={link}>Propriétés</NavLink>
                         {user && <NavLink to="/bookings" className={link}>Réservations</NavLink>}
@@ -78,18 +80,22 @@ export default function Layout() {
                         {user?.role === 'admin' && <NavLink to="/admin" className={link}>Modération</NavLink>}
                     </nav>
 
-                    {user ? (
-                        <UserMenu transparent={transparent} />
-                    ) : (
-                        <Link
-                            to="/login"
-                            className={`rounded-full px-5 py-2.5 transition-colors ${
-                                transparent ? 'bg-white text-black hover:bg-white/90' : 'bg-black text-white'
-                            }`}
-                        >
-                            Connexion
-                        </Link>
-                    )}
+                    {/* Droite : sur mobile, cercle navigation + cercle compte, presque collés */}
+                    <div className="flex items-center gap-1.5">
+                        <MobileNav user={user} transparent={transparent} />
+                        {user ? (
+                            <UserMenu transparent={transparent} />
+                        ) : (
+                            <Link
+                                to="/login"
+                                className={`rounded-full px-4 py-2 md:px-5 md:py-2.5 transition-colors ${
+                                    transparent ? 'bg-white text-black hover:bg-white/90' : 'bg-black text-white'
+                                }`}
+                            >
+                                Connexion
+                            </Link>
+                        )}
+                    </div>
                 </div>
             </header>
             <main className="flex-1"><Outlet /></main>

@@ -11,28 +11,112 @@ const fmtWhen = (iso) => {
     return `à ${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} · ${d.toLocaleDateString('fr-FR')}`;
 };
 
-/* ---------- Onglet 1 : annonces à modérer ---------- */
-function PendingVillas() {
-    const [villas, setVillas] = useState([]);
-    const load = () => api('/admin/properties', { params: { status: 'pending' } }).then((r) => setVillas(r.data));
-    useEffect(() => { load(); }, []);
+/* ---------- Onglet 1 : annonces (modération + suppression avec motif) ---------- */
+const VILLA_STATUS = [['pending', 'En attente'], ['approved', 'Approuvées'], ['rejected', 'Rejetées']];
 
-    const moderate = async (v, status) => {
-        await api(`/admin/properties/${v.id}/moderate`, { method: 'PATCH', body: { status } });
-        load();
+function ReasonModal({ villa, onClose, onDone }) {
+    const [reason, setReason] = useState('');
+    const [error, setError] = useState('');
+    const [busy, setBusy] = useState(false);
+
+    const submit = async () => {
+        setBusy(true);
+        setError('');
+        try {
+            await api(`/admin/properties/${villa.id}`, { method: 'DELETE', body: { reason } });
+            onDone();
+        } catch (e) {
+            setError(e.message);
+            setBusy(false);
+        }
     };
 
     return (
-        <div className="space-y-3">
-            {villas.length === 0 && <p className="text-neutral-500">Aucune annonce en attente.</p>}
-            {villas.map((v) => (
-                <div key={v.id} className="flex items-center gap-4 rounded-2xl border border-neutral-200 p-4">
-                    <img src={v.images?.[0]} alt="" className="h-16 w-24 rounded-xl object-cover bg-neutral-200" />
-                    <div className="flex-1 text-sm"><p className="font-semibold">{v.title}</p><p className="text-neutral-500">{v.city} · {eur(v.price_per_night)} · par {v.owner?.name}</p></div>
-                    <button onClick={() => moderate(v, 'approved')} className="rounded-full bg-black text-white px-4 py-2 text-xs font-semibold">Approuver</button>
-                    <button onClick={() => moderate(v, 'rejected')} className="rounded-full border border-rose-300 text-rose-700 px-4 py-2 text-xs font-semibold">Rejeter</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5" onClick={onClose}>
+            <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <p className="text-lg font-semibold">Supprimer « {villa.title} » ?</p>
+                <p className="mt-2 text-sm text-neutral-600">
+                    Écrivez la cause : elle sera envoyée à {villa.owner?.name ?? 'son propriétaire'}. Cette action est irréversible.
+                </p>
+                <textarea
+                    className="mt-4 w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-black"
+                    rows="4"
+                    placeholder="Ex. : cette villa n'existe pas ; les frais de publication n'ont pas encore été payés…"
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                />
+                {error && <p className="mt-2 text-sm text-rose-600">{error}</p>}
+                <div className="mt-6 flex justify-end gap-3">
+                    <button onClick={onClose} className="rounded-full border border-neutral-300 px-5 py-2.5 text-sm">Annuler</button>
+                    <button onClick={submit} disabled={busy} className="rounded-full bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+                        Supprimer et envoyer la cause
+                    </button>
                 </div>
-            ))}
+            </div>
+        </div>
+    );
+}
+
+function PendingVillas() {
+    const [status, setStatus] = useState('pending');
+    const [villas, setVillas] = useState([]);
+    const [target, setTarget] = useState(null); // villa à supprimer
+    const [error, setError] = useState('');
+
+    const load = () => api('/admin/properties', { params: { status } }).then((r) => setVillas(r.data));
+    useEffect(() => { load(); }, [status]);
+
+    const moderate = async (v, newStatus) => {
+        setError('');
+        try {
+            await api(`/admin/properties/${v.id}/moderate`, { method: 'PATCH', body: { status: newStatus } });
+            load();
+        } catch (e) { setError(e.message); }
+    };
+
+    return (
+        <div>
+            <div className="mb-5 inline-flex rounded-full bg-neutral-100 p-1 text-xs font-medium">
+                {VILLA_STATUS.map(([key, label]) => (
+                    <button
+                        key={key}
+                        onClick={() => setStatus(key)}
+                        className={`rounded-full px-4 py-1.5 transition-colors ${status === key ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'}`}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </div>
+
+            {error && <p className="mb-3 text-sm text-rose-600">{error}</p>}
+
+            <div className="space-y-3">
+                {villas.length === 0 && <p className="text-neutral-500">Aucune annonce dans cette liste.</p>}
+                {villas.map((v) => (
+                    <div key={v.id} className="flex flex-wrap items-center gap-4 rounded-2xl border border-neutral-200 p-4">
+                        <img src={v.images?.[0]} alt="" className="h-16 w-24 rounded-xl object-cover bg-neutral-200" />
+                        <div className="min-w-40 flex-1 text-sm">
+                            <p className="font-semibold">{v.title}</p>
+                            <p className="text-neutral-500">{v.city} · {eur(v.price_per_night)} · par {v.owner?.name}</p>
+                        </div>
+                        {status !== 'approved' && (
+                            <button onClick={() => moderate(v, 'approved')} className="rounded-full bg-black text-white px-4 py-2 text-xs font-semibold">Approuver</button>
+                        )}
+                        {status === 'pending' && (
+                            <button onClick={() => moderate(v, 'rejected')} className="rounded-full border border-neutral-300 px-4 py-2 text-xs font-semibold">Rejeter</button>
+                        )}
+                        <button onClick={() => setTarget(v)} className="rounded-full border border-rose-300 text-rose-700 px-4 py-2 text-xs font-semibold">Supprimer</button>
+                    </div>
+                ))}
+            </div>
+
+            {target && (
+                <ReasonModal
+                    villa={target}
+                    onClose={() => setTarget(null)}
+                    onDone={() => { setTarget(null); load(); }}
+                />
+            )}
         </div>
     );
 }

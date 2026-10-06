@@ -31,17 +31,19 @@ class AdminUserController extends Controller
             ]);
     }
 
-    /** PATCH /admin/users/{user}/suspend  {suspended: true|false} */
+        /** PATCH /admin/users/{user}/suspend  {suspended: true|false} */
     public function suspend(Request $request, User $user)
     {
         abort_if($user->role === 'admin', 403, 'Un compte concierge ne peut pas être suspendu.');
         $suspended = $request->validate(['suspended' => 'required|boolean'])['suspended'];
 
-        $user->update(['suspended_at' => $suspended ? now() : null]);
+        // forceFill : suspended_at n'est pas dans $fillable, volontairement (aucune requête publique ne doit pouvoir l'écrire)
+        $user->forceFill(['suspended_at' => $suspended ? now() : null])->save();
+
         if ($suspended) {
-            $user->tokens()->delete(); // déconnecte l'utilisateur immédiatement
+            $user->tokens()->delete(); // coupe les sessions déjà ouvertes
         }
 
-        return ['id' => $user->id, 'suspended' => $suspended];
+        return ['id' => $user->id, 'suspended' => (bool) $user->suspended_at];
     }
 }

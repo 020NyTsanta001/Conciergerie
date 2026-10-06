@@ -20,6 +20,10 @@ export async function api(path, { method = 'GET', body, params } = {}) {
     if (res.status === 204) return null;
     const data = await res.json().catch(() => null);
     if (!res.ok) {
+            if (res.status === 401 && token) {
+                localStorage.removeItem('token');
+                window.dispatchEvent(new Event('auth:expired')); // session invalidée côté serveur (compte suspendu…)
+            }
         const firstError = data?.errors ? Object.values(data.errors)[0][0] : null;
         const err = new Error(firstError || data?.message || 'Erreur serveur');
         err.status = res.status;

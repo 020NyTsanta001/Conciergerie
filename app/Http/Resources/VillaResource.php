@@ -19,6 +19,8 @@ class VillaResource extends JsonResource
             'bedrooms' => $this->bedrooms,
             'capacity' => $this->capacity,
             'has_pool' => $this->has_pool,
+            'has_yacht' => $this->has_yacht,
+            'yacht_image' => $this->yacht_image,
             'is_featured' => $this->is_featured,
             'status' => $this->status,
             'images' => $this->whenLoaded('images', fn () => $this->images->pluck('url')),

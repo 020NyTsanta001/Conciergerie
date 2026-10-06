@@ -9,6 +9,8 @@ export default function UserMenu({ transparent }) {
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
 
+    const initial = user.name.trim().charAt(0).toUpperCase();
+
     useEffect(() => { setOpen(false); }, [pathname]);
 
     useEffect(() => {
@@ -26,16 +28,20 @@ export default function UserMenu({ transparent }) {
         <div ref={ref} className="relative">
             <button
                 onClick={() => setOpen(!open)}
+                aria-label="Menu du compte"
                 aria-haspopup="menu"
                 aria-expanded={open}
-                className={`flex items-center gap-2 rounded-full border px-4 py-2 transition-colors ${
+                className={`flex h-9 w-9 items-center justify-center rounded-full border font-semibold transition-colors md:h-auto md:w-auto md:gap-2 md:px-4 md:py-2 md:font-medium ${
                     transparent
                         ? 'border-white/70 text-white hover:bg-white/15'
                         : 'border-neutral-300 text-neutral-900 hover:bg-neutral-50'
                 }`}
             >
-                <span className="max-w-[10rem] truncate">{user.name}</span>
-                <span className={`text-xs transition-transform ${open ? 'rotate-180' : ''}`}>▾</span>
+                {/* mobile : initiale seule */}
+                <span className="md:hidden">{initial}</span>
+                {/* ordinateur : nom complet + flèche */}
+                <span className="hidden max-w-[10rem] truncate md:inline">{user.name}</span>
+                <span className={`hidden text-xs transition-transform md:inline ${open ? 'rotate-180' : ''}`}>▾</span>
             </button>
 
             {open && (

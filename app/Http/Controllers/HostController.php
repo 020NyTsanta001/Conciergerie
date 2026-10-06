@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\VillaResource;
+use App\Models\ActivityLog;
 use App\Models\Villa;
+use App\Services\VillaService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class HostController extends Controller
 {
@@ -13,7 +16,8 @@ class HostController extends Controller
         return VillaResource::collection($request->user()->villas()->with(['images', 'seasons'])->latest()->get());
     }
 
-    public function store(Request $request)
+    /** Validation commune à la création et à la modification. Retourne [attributs, images|null]. */
+    private function validated(Request $request): array
     {
         $data = $request->validate([
             'title' => 'required|string|max:150',
@@ -24,16 +28,67 @@ class HostController extends Controller
             'bedrooms' => 'required|integer|min:1',
             'capacity' => 'required|integer|min:1',
             'has_pool' => 'boolean',
+            'has_yacht' => 'boolean',
+            'yacht_image' => [Rule::requiredIf(fn () => $request->boolean('has_yacht')), 'nullable', 'url', 'max:500'],
             'images' => 'array|max:10',
             'images.*' => 'url',
+        ], [
+            'yacht_image.required' => 'Ajoutez le lien de la photo du yacht.',
         ]);
 
-        $villa = $request->user()->villas()->create(collect($data)->except('images')->all() + ['status' => 'pending']);
-        foreach ($data['images'] ?? [] as $i => $url) {
+        $attributes = collect($data)->except('images')->all();
+        if (empty($attributes['has_yacht'])) {      // pas de yacht : on ne garde aucune photo de yacht
+            $attributes['has_yacht'] = false;
+            $attributes['yacht_image'] = null;
+        }
+
+        return [$attributes, $data['images'] ?? null];
+    }
+
+    public function store(Request $request)
+    {
+        [$attributes, $images] = $this->validated($request);
+
+        $villa = $request->user()->villas()->create($attributes + ['status' => 'pending']);
+        foreach ($images ?? [] as $i => $url) {
             $villa->images()->create(['url' => $url, 'position' => $i]);
         }
 
         return (new VillaResource($villa->load('images')))->response()->setStatusCode(201);
+    }
+
+    /** PUT /host/properties/{villa} : réservé au créateur */
+    public function update(Request $request, Villa $villa)
+    {
+        abort_unless($villa->owner_id === $request->user()->id, 403, 'Seul le créateur de la villa peut la modifier.');
+
+        [$attributes, $images] = $this->validated($request);
+
+        if ($villa->status === 'rejected') {
+            $attributes['status'] = 'pending'; // une annonce rejetée puis modifiée est soumise à nouveau
+        }
+        $villa->update($attributes);
+
+        if ($images !== null) {                      // liste de photos fournie : elle remplace l'ancienne
+            $villa->images()->delete();
+            foreach ($images as $i => $url) {
+                $villa->images()->create(['url' => $url, 'position' => $i]);
+            }
+        }
+
+        ActivityLog::record($request->user(), 'villa_updated', "a modifié la villa « {$villa->title} »");
+
+        return new VillaResource($villa->load(['images', 'seasons']));
+    }
+
+    /** DELETE /host/properties/{villa} : le créateur confirme, sans motif à fournir */
+    public function destroy(Request $request, Villa $villa, VillaService $villas)
+    {
+        abort_unless($villa->owner_id === $request->user()->id, 403, 'Seul le créateur de la villa peut la supprimer ici.');
+
+        $villas->delete($villa, $request->user());
+
+        return response()->noContent();
     }
 
     /** Tarifs saisonniers : PUT /host/properties/{villa}/seasons  [{season_id, price_per_night}] */

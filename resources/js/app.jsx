@@ -3,6 +3,8 @@ import '@fontsource-variable/manrope';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth';
+import ErrorBoundary from './components/ErrorBoundary';
+import Preloader from './components/Preloader';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Villas from './pages/Villas';
@@ -21,21 +23,28 @@ function Protected({ roles, children }) {
     return children;
 }
 
-createRoot(document.getElementById('root')).render(
-    <BrowserRouter>
-        <AuthProvider>
-            <Routes>
-                <Route element={<Layout />}>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/villas" element={<Villas />} />
-                    <Route path="/villas/:id" element={<VillaDetail />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/bookings" element={<Protected><Bookings /></Protected>} />
-                    <Route path="/host" element={<Protected roles={['host', 'admin']}><Host /></Protected>} />
-                    <Route path="/admin" element={<Protected roles={['admin']}><Admin /></Protected>} />
-                    <Route path="/account" element={<Protected roles={['client', 'host']}><Account /></Protected>} />
-                </Route>
-            </Routes>
-        </AuthProvider>
-    </BrowserRouter>
+// Une seule racine React, même si ce fichier est ré-exécuté par le rechargement à chaud de Vite
+const container = document.getElementById('root');
+const root = (container._reactRoot ??= createRoot(container));
+
+root.render(
+    <ErrorBoundary>
+        <BrowserRouter>
+            <AuthProvider>
+                <Preloader />
+                <Routes>
+                    <Route element={<Layout />}>
+                        <Route path="/" element={<Home />} />
+                        <Route path="/villas" element={<Villas />} />
+                        <Route path="/villas/:id" element={<VillaDetail />} />
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/bookings" element={<Protected><Bookings /></Protected>} />
+                        <Route path="/account" element={<Protected roles={['client', 'host']}><Account /></Protected>} />
+                        <Route path="/host" element={<Protected roles={['host', 'admin']}><Host /></Protected>} />
+                        <Route path="/admin" element={<Protected roles={['admin']}><Admin /></Protected>} />
+                    </Route>
+                </Routes>
+            </AuthProvider>
+        </BrowserRouter>
+    </ErrorBoundary>
 );

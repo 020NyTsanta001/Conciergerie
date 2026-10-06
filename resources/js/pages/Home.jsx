@@ -5,6 +5,7 @@ import VillaCard from '../components/VillaCard';
 import ContactSection from '../components/ContactSection';
 import HeroScroll from '../components/HeroScroll';
 import HowItWorks from '../components/HowItWorks';
+import YachtSection from '../components/YachtSection';
 
 export default function Home() {
     const [stats, setStats] = useState(null);
@@ -43,6 +44,7 @@ export default function Home() {
                     ))}
                 </div>
             </section>
+             <YachtSection />
             <ContactSection />
         
         </>
