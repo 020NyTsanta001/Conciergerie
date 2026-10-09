@@ -41,7 +41,6 @@ export default function Login() {
             <button type="button" onClick={() => setMode(mode === 'login' ? 'register' : 'login')} className="text-sm text-neutral-500 underline">
                 {mode === 'login' ? 'Pas de compte ? Inscription' : 'Déjà inscrit ? Connexion'}
             </button>
-            <p className="text-xs text-neutral-400 pt-4">Démo : client@luxe.test · host@luxe.test · admin@luxe.test / password</p>
         </form>
     );
 }

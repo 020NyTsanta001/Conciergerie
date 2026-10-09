@@ -17,8 +17,10 @@ class HostController extends Controller
     }
 
     /** Validation commune à la création et à la modification. Retourne [attributs, images|null]. */
-    private function validated(Request $request): array
+        private function validated(Request $request): array
     {
+        $yacht = Rule::requiredIf(fn () => $request->boolean('has_yacht'));
+
         $data = $request->validate([
             'title' => 'required|string|max:150',
             'description' => 'required|string',
@@ -29,17 +31,26 @@ class HostController extends Controller
             'capacity' => 'required|integer|min:1',
             'has_pool' => 'boolean',
             'has_yacht' => 'boolean',
-            'yacht_image' => [Rule::requiredIf(fn () => $request->boolean('has_yacht')), 'nullable', 'url', 'max:500'],
+            'yacht_image' => [$yacht, 'nullable', 'url', 'max:500'],
+            'yacht_name' => [$yacht, 'nullable', 'string', 'max:80'],
+            'yacht_description' => [$yacht, 'nullable', 'string', 'max:300'],
+            'yacht_places' => [$yacht, 'nullable', 'array', 'min:1', 'max:2'],
+            'yacht_places.*' => ['required', 'string', 'max:80'],
             'images' => 'array|max:10',
             'images.*' => 'url',
         ], [
             'yacht_image.required' => 'Ajoutez le lien de la photo du yacht.',
+            'yacht_name.required' => 'Indiquez le nom du yacht.',
+            'yacht_description.required' => 'Ajoutez une courte description du yacht.',
+            'yacht_places.required' => 'Indiquez au moins un lieu de sortie.',
         ]);
 
         $attributes = collect($data)->except('images')->all();
-        if (empty($attributes['has_yacht'])) {      // pas de yacht : on ne garde aucune photo de yacht
+        if (empty($attributes['has_yacht'])) {      // pas de yacht : on ne garde aucune information de yacht
             $attributes['has_yacht'] = false;
-            $attributes['yacht_image'] = null;
+            foreach (['yacht_image', 'yacht_name', 'yacht_description', 'yacht_places'] as $k) {
+                $attributes[$k] = null;
+            }
         }
 
         return [$attributes, $data['images'] ?? null];

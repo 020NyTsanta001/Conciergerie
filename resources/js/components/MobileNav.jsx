@@ -43,7 +43,7 @@ export default function MobileNav({ user, transparent }) {
                 <div role="menu" className="absolute right-0 mt-2 w-56 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl">
                     <NavLink to="/villas" className={item}>Propriétés</NavLink>
                     {user && <NavLink to="/bookings" className={item}>Réservations</NavLink>}
-                    {user && ['host', 'admin'].includes(user.role) && <NavLink to="/host" className={item}>Mes villas</NavLink>}
+                    {user?.role === 'host' && <NavLink to="/host" className={item}>Mes villas</NavLink>}
                     {user?.role === 'admin' && <NavLink to="/admin" className={item}>Modération</NavLink>}
                 </div>
             )}

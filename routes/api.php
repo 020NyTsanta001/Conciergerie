@@ -39,7 +39,7 @@ Route::prefix('v1')->group(function () {
         Route::post('bookings/{booking}/pay', [BookingController::class, 'pay']);
         Route::get('notifications', [BookingController::class, 'notifications']);
 
-        Route::middleware(EnsureRole::class.':host,admin')->prefix('host')->group(function () {
+        Route::middleware(EnsureRole::class.':host')->prefix('host')->group(function () {
             Route::get('properties', [HostController::class, 'index']);
             Route::post('properties', [HostController::class, 'store']);
             Route::put('properties/{villa}', [HostController::class, 'update']);

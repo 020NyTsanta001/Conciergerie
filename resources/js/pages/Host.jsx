@@ -4,7 +4,8 @@ import { api, eur } from '../api';
 const field = 'rounded-xl border border-neutral-300 px-3 py-2.5 text-sm w-full outline-none focus:border-black';
 const empty = {
     title: '', description: '', city: '', country: '', price_per_night: '',
-    bedrooms: 1, capacity: 2, has_pool: false, has_yacht: false, yacht_image: '', image: '',
+    bedrooms: 1, capacity: 2, has_pool: false, has_yacht: false, image: '',
+    yacht_image: '', yacht_name: '', yacht_description: '', yacht_place1: '', yacht_place2: '',
 };
 const BADGE = { pending: 'bg-amber-100 text-amber-800', approved: 'bg-emerald-100 text-emerald-800', rejected: 'bg-rose-100 text-rose-800' };
 
@@ -31,8 +32,9 @@ export default function Host() {
         setF({
             title: v.title, description: v.description, city: v.city, country: v.country,
             price_per_night: v.price_per_night, bedrooms: v.bedrooms, capacity: v.capacity,
-            has_pool: v.has_pool, has_yacht: v.has_yacht, yacht_image: v.yacht_image ?? '',
-            image: v.images?.[0] ?? '',
+            has_pool: v.has_pool, has_yacht: v.has_yacht, image: v.images?.[0] ?? '',
+            yacht_image: v.yacht_image ?? '', yacht_name: v.yacht_name ?? '', yacht_description: v.yacht_description ?? '',
+            yacht_place1: v.yacht_places?.[0] ?? '', yacht_place2: v.yacht_places?.[1] ?? '',
         });
         formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
@@ -42,10 +44,17 @@ export default function Host() {
     const submit = async (e) => {
         e.preventDefault();
         setMsg('');
-        const { image, yacht_image, ...rest } = f;
+        const { image, yacht_image, yacht_name, yacht_description, yacht_place1, yacht_place2, ...rest } = f;
         // en modification, la photo saisie remplace la 1re photo ; les autres photos de la villa sont conservées
         const others = editing ? (editing.images ?? []).slice(1) : [];
-        const body = { ...rest, images: image ? [image, ...others] : others, yacht_image: f.has_yacht ? yacht_image : null };
+        const body = {
+            ...rest,
+            images: image ? [image, ...others] : others,
+            yacht_image: f.has_yacht ? yacht_image : null,
+            yacht_name: f.has_yacht ? yacht_name.trim() : null,
+            yacht_description: f.has_yacht ? yacht_description.trim() : null,
+            yacht_places: f.has_yacht ? [yacht_place1, yacht_place2].map((s) => s.trim()).filter(Boolean) : null,
+        };
         try {
             if (editing) {
                 await api(`/host/properties/${editing.id}`, { method: 'PUT', body });
@@ -120,7 +129,16 @@ export default function Host() {
                 </div>
 
                 {f.has_yacht && (
-                    <input className={field} type="url" placeholder="Lien de la photo du yacht (https://…)" value={f.yacht_image} onChange={set('yacht_image')} required />
+                    <div className="space-y-3 rounded-2xl bg-neutral-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">Votre yacht</p>
+                        <input className={field} type="url" placeholder="Lien de la photo du yacht (https://…)" value={f.yacht_image} onChange={set('yacht_image')} required />
+                        <input className={field} placeholder="Nom du yacht" maxLength={80} value={f.yacht_name} onChange={set('yacht_name')} required />
+                        <textarea className={field} rows="3" maxLength={300} placeholder="Courte description du yacht (300 caractères max.)" value={f.yacht_description} onChange={set('yacht_description')} required />
+                        <div className="grid grid-cols-2 gap-3">
+                            <input className={field} maxLength={80} placeholder="Lieu de sortie n°1" value={f.yacht_place1} onChange={set('yacht_place1')} required />
+                            <input className={field} maxLength={80} placeholder="Lieu de sortie n°2 (facultatif)" value={f.yacht_place2} onChange={set('yacht_place2')} />
+                        </div>
+                    </div>
                 )}
 
                 <input className={field} type="url" placeholder="URL d'une photo de la villa (https://…)" value={f.image} onChange={set('image')} />

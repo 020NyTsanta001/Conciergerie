@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 
 const MIN_MS = 700;   // durée minimale d'affichage (évite un flash quand tout est déjà en cache)
 const MAX_MS = 6000;  // sécurité : on entre dans le site quoi qu'il arrive
-// poids de chaque tâche dans la barre (la photo du hero est la plus lourde)
 const WEIGHTS = { logos: 2, hero: 5, fonts: 2 };
 const TOTAL = Object.values(WEIGHTS).reduce((a, b) => a + b, 0);
+
+const HERO = '/images/hero-villa.jpg';
+
 
 // Charge ET décode une image : elle s'affichera ensuite sans saccade
 const loadImage = (src) =>
@@ -19,28 +21,50 @@ export default function Preloader() {
     const [done, setDone] = useState({});
     const [shown, setShown] = useState(0);
     const [phase, setPhase] = useState('loading'); // loading → leaving → gone
+    const [run, setRun] = useState(0);             // +1 à chaque relance (ex. après une connexion)
     const start = useRef(performance.now());
     const target = useRef(0);
+    const destination = useRef(window.location.pathname); // page vers laquelle on charge
 
     const finish = (key) => setDone((d) => (d[key] ? d : { ...d, [key]: true }));
 
-    // 1) Ressources du design (pas les villas : elles dépendent d'internet)
+    // Relance à la demande :
+    //   window.dispatchEvent(new CustomEvent('preloader:show', { detail: { to: '/' } }))
     useEffect(() => {
-        const isHome = window.location.pathname === '/';
+        const onShow = (e) => {
+            destination.current = e.detail?.to ?? window.location.pathname;
+            start.current = performance.now();
+            target.current = 0;
+            setDone({});
+            setShown(0);
+            setPhase('loading');
+            setRun((r) => r + 1);
+        };
+        window.addEventListener('preloader:show', onShow);
+        return () => window.removeEventListener('preloader:show', onShow);
+    }, []);
+
+    // 1) Ressources du design de la page de destination (pas les villas : elles dépendent d'internet)
+    useEffect(() => {
+        const path = destination.current;
+        const pageImage = path === '/' ? HERO : null;
 
         Promise.all([loadImage('/images/logo-black.svg'), loadImage('/images/logo-white.svg')]).then(() => finish('logos'));
-        (isHome ? loadImage('/images/hero-villa.jpg') : Promise.resolve()).then(() => finish('hero'));
+        (pageImage ? loadImage(pageImage) : Promise.resolve()).then(() => finish('hero'));
         (document.fonts
             ? Promise.all([document.fonts.load('16px "Manrope Variable"'), document.fonts.ready])
             : Promise.resolve()
         ).catch(() => {}).then(() => finish('fonts'));
-    }, []);
+
+    }, [run]);
 
     // 2) Pourcentage réel visé
     target.current = (Object.entries(WEIGHTS).reduce((s, [k, w]) => s + (done[k] ? w : 0), 0) / TOTAL) * 100;
 
     // 3) Barre fluide : le pourcentage affiché rattrape progressivement le pourcentage réel
+    const active = phase !== 'gone';
     useEffect(() => {
+        if (!active) return;
         let raf;
         const tick = () => {
             setShown((s) => Math.min(target.current, s + (target.current - s) * 0.12 + (target.current > s ? 0.15 : 0)));
@@ -48,7 +72,7 @@ export default function Preloader() {
         };
         raf = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf);
-    }, []);
+    }, [active]);
 
     // 4) Sortie : 100 % atteint + durée minimale écoulée
     useEffect(() => {
@@ -58,11 +82,11 @@ export default function Preloader() {
         return () => clearTimeout(t);
     }, [shown, phase]);
 
-    // Délai de sécurité
+    // Délai de sécurité (relancé à chaque run)
     useEffect(() => {
         const t = setTimeout(() => setPhase((p) => (p === 'loading' ? 'leaving' : p)), MAX_MS);
         return () => clearTimeout(t);
-    }, []);
+    }, [run]);
 
     useEffect(() => {
         if (phase !== 'leaving') return;

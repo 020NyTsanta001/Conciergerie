@@ -15,6 +15,7 @@ import Host from './pages/Host';
 import Admin from './pages/Admin';
 import Account from './pages/Account';
 
+
 function Protected({ roles, children }) {
     const { user, ready } = useAuth();
     if (!ready) return null;
@@ -38,13 +39,15 @@ root.render(
                         <Route path="/villas" element={<Villas />} />
                         <Route path="/villas/:id" element={<VillaDetail />} />
                         <Route path="/login" element={<Login />} />
+                        
                         <Route path="/bookings" element={<Protected><Bookings /></Protected>} />
                         <Route path="/account" element={<Protected roles={['client', 'host']}><Account /></Protected>} />
-                        <Route path="/host" element={<Protected roles={['host', 'admin']}><Host /></Protected>} />
+                        <Route path="/host" element={<Protected roles={['host']}><Host /></Protected>} />
                         <Route path="/admin" element={<Protected roles={['admin']}><Admin /></Protected>} />
+                        
                     </Route>
                 </Routes>
             </AuthProvider>
         </BrowserRouter>
     </ErrorBoundary>
-);
+);j

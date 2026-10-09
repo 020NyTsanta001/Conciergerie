@@ -76,7 +76,7 @@ export default function Layout() {
                     <nav className="hidden md:flex gap-8">
                         <NavLink to="/villas" className={link}>Propriétés</NavLink>
                         {user && <NavLink to="/bookings" className={link}>Réservations</NavLink>}
-                        {user && ['host', 'admin'].includes(user.role) && <NavLink to="/host" className={link}>Mes villas</NavLink>}
+                        {user?.role === 'host' && <NavLink to="/host" className={link}>Mes villas</NavLink>}
                         {user?.role === 'admin' && <NavLink to="/admin" className={link}>Modération</NavLink>}
                     </nav>
 
@@ -100,7 +100,7 @@ export default function Layout() {
             </header>
             <main className="flex-1"><Outlet /></main>
             <footer className="border-t border-neutral-100 py-8 text-center text-xs text-neutral-500">
-                © {new Date().getFullYear()} Maison Élite — Conciergerie immobilière & expériences de luxe
+                © {new Date().getFullYear()} Hoxen — Conciergerie immobilière & expériences de luxe NyTs
             </footer>
         </div>
     );

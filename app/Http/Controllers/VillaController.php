@@ -49,6 +49,7 @@ class VillaController extends Controller
         return Season::orderBy('start_date')->get();
     }
     
+
         /** GET /yachts : jusqu'à 4 yachts au hasard, parmi les villas approuvées qui en ont un */
     public function yachts()
     {
@@ -57,13 +58,16 @@ class VillaController extends Controller
             ->whereNotNull('yacht_image')
             ->inRandomOrder()
             ->limit(4)
-            ->get(['id', 'title', 'city', 'country', 'yacht_image'])
+            ->get(['id', 'title', 'city', 'country', 'yacht_image', 'yacht_name', 'yacht_description', 'yacht_places'])
             ->map(fn ($v) => [
                 'villa_id' => $v->id,
                 'villa_title' => $v->title,
                 'city' => $v->city,
                 'country' => $v->country,
                 'image' => $v->yacht_image,
+                'name' => $v->yacht_name ?: 'Yacht de '.$v->title,
+                'description' => $v->yacht_description,
+                'places' => $v->yacht_places ?? [],
             ]);
     }
 }
