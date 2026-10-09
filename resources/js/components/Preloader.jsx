@@ -5,7 +5,7 @@ const MAX_MS = 6000;  // sécurité : on entre dans le site quoi qu'il arrive
 const WEIGHTS = { logos: 2, hero: 5, fonts: 2 };
 const TOTAL = Object.values(WEIGHTS).reduce((a, b) => a + b, 0);
 
-const HERO = '/images/hero-villa.jpg';
+const HERO = '/images/hero-villa.webp';
 
 
 // Charge ET décode une image : elle s'affichera ensuite sans saccade

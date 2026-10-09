@@ -8,7 +8,7 @@ const LINKS = {
     orgGithub: 'https://github.com/MIT452', 
     cv: '/cv.pdf',  // fichier à placer dans public/cv.pdf
 };
-const PHOTO = '/images/profile.jpg';
+const PHOTO = '/images/profile.webp';
 
 const field = 'w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-black';
 

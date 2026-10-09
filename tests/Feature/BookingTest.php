@@ -37,15 +37,34 @@ class BookingTest extends TestCase
     {
         $host = $this->user('host');
         $client = $this->user('client');
+        $admin = $this->user('admin');
         $villa = $this->villa($host);
 
         $id = $this->actingAs($client, 'sanctum')->postJson('/api/v1/bookings', [
             'villa_id' => $villa->id, 'check_in' => '2027-03-10', 'check_out' => '2027-03-12', 'guests' => 2,
         ])->assertCreated()->assertJsonPath('data.status', 'pending_host')->json('data.id');
 
+        // l'admin ne gère pas les réservations ; c'est le propriétaire de la villa qui approuve
+        $this->actingAs($admin, 'sanctum')->patchJson("/api/v1/bookings/{$id}/status", ['action' => 'validate'])->assertForbidden();
         $this->actingAs($host, 'sanctum')->patchJson("/api/v1/bookings/{$id}/status", ['action' => 'validate'])->assertJsonPath('data.status', 'validated');
+
         $this->actingAs($client, 'sanctum')->postJson("/api/v1/bookings/{$id}/pay", ['type' => 'deposit'])->assertJsonPath('booking.data.status', 'deposit_paid');
+        // l'acompte est notifié à l'hôte seulement
+        $this->assertSame(1, $host->notifications()->where('data', 'like', '%Acompte%')->count());
+        $this->assertSame(0, $admin->notifications()->where('data', 'like', '%Acompte%')->count());
+
         $this->actingAs($client, 'sanctum')->postJson("/api/v1/bookings/{$id}/pay", ['type' => 'balance'])->assertJsonPath('booking.data.status', 'balance_paid');
+
+        // payée en intégralité : 2000 € -> 15 % (300 €) pour l'admin, 85 % (1700 €) pour l'hôte au total
+        $this->assertDatabaseHas('payouts', [
+            'booking_id' => $id, 'host_id' => $host->id,
+            'gross' => 2000, 'commission' => 300, 'amount' => 1700, 'status' => 'paid',
+        ]);
+        $this->assertSame(1, $host->notifications()->where('data', 'like', '%Solde%')->count());
+        $this->assertSame(1, $admin->notifications()->where('data', 'like', '%Commission%')->count());
+
+        // l'admin ne démarre pas le séjour ; l'hôte démarre et clôture
+        $this->actingAs($admin, 'sanctum')->patchJson("/api/v1/bookings/{$id}/status", ['action' => 'start'])->assertForbidden();
         $this->actingAs($host, 'sanctum')->patchJson("/api/v1/bookings/{$id}/status", ['action' => 'start'])->assertJsonPath('data.status', 'in_progress');
         $this->actingAs($host, 'sanctum')->patchJson("/api/v1/bookings/{$id}/status", ['action' => 'close'])->assertJsonPath('data.status', 'closed');
     }

@@ -20,7 +20,7 @@ export default function Home() {
 
     return (
         <>
-            <HeroScroll image="/images/hero-villa.jpg" stats={stats} />
+            <HeroScroll image="/images/hero-villa.webp" stats={stats} />
 
             <section id="every-home" className="mx-auto max-w-7xl px-5 py-24 grid md:grid-cols-2 gap-12 items-start">
                 <div className="md:sticky md:top-28">

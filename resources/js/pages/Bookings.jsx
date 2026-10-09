@@ -16,8 +16,10 @@ export default function Bookings() {
     const [items, setItems] = useState([]);
     const [notifs, setNotifs] = useState([]);
     const [error, setError] = useState('');
+    const [payouts, setPayouts] = useState(null);
 
     const load = () => {
+        if (user.role === 'host') api('/host/payouts').then(setPayouts).catch(() => {});
         api('/bookings').then((r) => setItems(r.data));
         api('/notifications').then(setNotifs);
     };
@@ -33,9 +35,13 @@ export default function Bookings() {
     return (
         <div className="mx-auto max-w-5xl px-5 py-12">
             <h1 className="text-5xl tracking-tight mb-8">Réservations</h1>
-            {user.role !== 'client' && (
-                <p className="mb-6 rounded-2xl bg-neutral-100 px-5 py-4 text-sm">Encaissé à ce jour : <b>{eur(revenue)}</b></p>
+            {user.role === 'host' && payouts && (
+                <p className="mb-6 rounded-2xl bg-emerald-50 px-5 py-4 text-sm">
+                    Total reçu : <b>{eur(payouts.received)}</b>{' '}
+                    <span className="text-neutral-500">(acomptes + 85 % des séjours payés en intégralité)</span>
+                </p>
             )}
+            
             {notifs.length > 0 && (
                 <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm space-y-1">
                     <p className="font-semibold">Notifications</p>

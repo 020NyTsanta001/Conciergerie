@@ -13,6 +13,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminActivityController;
 use App\Http\Controllers\AdminUserController;
+use App\Http\Controllers\PayoutController;
 
 Route::prefix('v1')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
@@ -45,6 +46,7 @@ Route::prefix('v1')->group(function () {
             Route::put('properties/{villa}', [HostController::class, 'update']);
             Route::delete('properties/{villa}', [HostController::class, 'destroy']);
             Route::put('properties/{villa}/seasons', [HostController::class, 'syncSeasons']);
+            Route::get('payouts', [PayoutController::class, 'hostIndex']);
             
             
         });
@@ -56,6 +58,9 @@ Route::prefix('v1')->group(function () {
             Route::patch('users/{user}/suspend', [AdminUserController::class, 'suspend']);
             Route::get('activity', [AdminActivityController::class, 'index']);
             Route::delete('properties/{villa}', [AdminController::class, 'destroy']);
+            Route::get('payouts', [PayoutController::class, 'adminIndex']);
+            Route::patch('payouts/{payout}/paid', [PayoutController::class, 'markPaid']);
+            Route::patch('payouts/{payout}/paid', [PayoutController::class, 'markPaid']);
         });
     });
 });

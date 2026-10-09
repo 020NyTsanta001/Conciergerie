@@ -7,13 +7,16 @@ use App\Events\BookingSubmitted;
 use App\Models\Booking;
 use App\Models\User;
 use App\Models\Villa;
+use App\Models\Payout;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use App\Notifications\InfoNotification;
 
 class BookingService
 {
+    public const COMMISSION_RATE = 0.15; // part de la plateforme (admin) sur une réservation payée en intégralité
     public function __construct(private PricingService $pricing) {}
 
     /**
@@ -71,12 +74,13 @@ class BookingService
         if (! $b->status->canGoTo($to)) {
             return false;
         }
-        $isHost = $u->role === 'admin' || $b->villa->owner_id === $u->id;
+        // L'admin ne gère aucune réservation : il les consulte seulement.
+        $isOwner = $b->villa->owner_id === $u->id;
         $isClient = $b->user_id === $u->id;
 
         return match ($to) {
-            S::Validated, S::InProgress, S::Closed => $isHost,
-            S::Cancelled => $isHost || ($isClient && in_array($b->status, [S::Submitted, S::PendingHost, S::Validated], true)),
+            S::Validated, S::InProgress, S::Closed => $isOwner,   // le propriétaire approuve, démarre et clôture
+            S::Cancelled => $isOwner || ($isClient && in_array($b->status, [S::Submitted, S::PendingHost, S::Validated], true)),
             default => false,
         };
     }
@@ -107,7 +111,7 @@ class BookingService
         return $b;
     }
 
-    /** Paiement simulé (faux provider) : acompte de 30 % puis solde. */
+        /** Paiement simulé : l'acompte (30 %) va à l'hôte ; le solde déclenche le règlement final 85 % / 15 %. */
     public function pay(User $u, Booking $b, string $type): array
     {
         abort_unless($b->user_id === $u->id, 403, 'Réservation non associée à votre compte.');
@@ -120,8 +124,55 @@ class BookingService
             throw ValidationException::withMessages(['type' => "Paiement « {$type} » impossible à ce stade."]);
         }
 
-        $b->update(['status' => $to, 'paid_amount' => $b->paid_amount + $amount]);
+        DB::transaction(function () use ($b, $to, $amount, $type) {
+            $b->update(['status' => $to, 'paid_amount' => $b->paid_amount + $amount]);
+            $b->loadMissing('villa.owner');
+
+            if ($type === 'deposit') {
+                // l'acompte va à l'hôte, et seul lui est notifié
+                $b->villa->owner->notify(new InfoNotification(
+                    "Acompte reçu pour la réservation #{$b->id} (« {$b->villa->title} ») : ".$this->eur($amount).'.'
+                ));
+            } else {
+                $this->settle($b);
+            }
+        });
 
         return ['reference' => 'FAKE-'.Str::upper(Str::random(8)), 'amount' => round($amount, 2), 'booking' => $b];
+    }
+
+    /** Réservation payée en intégralité : 85 % du total à l'hôte (acompte compris), 15 % de commission à l'admin. */
+    private function settle(Booking $b): void
+    {
+        $host = $b->villa->owner;
+        $gross = (float) $b->total_price;
+        $commission = round($gross * self::COMMISSION_RATE, 2);
+        $hostShare = round($gross - $commission, 2);                       // 85 % pour l'hôte en tout
+        $hostBalance = round($hostShare - (float) $b->deposit_amount, 2);  // part reçue au moment du solde
+
+        Payout::firstOrCreate(['booking_id' => $b->id], [
+            'host_id' => $host->id,
+            'gross' => $gross,
+            'commission' => $commission,
+            'amount' => $hostShare,
+            'status' => 'paid',      // règlement simulé : instantané
+            'paid_at' => now(),
+        ]);
+
+        $host->notify(new InfoNotification(
+            "Solde reçu pour la réservation #{$b->id} (« {$b->villa->title} ») : ".$this->eur($hostBalance).
+            '. Total reçu avec l\'acompte : '.$this->eur($hostShare).' (85 %).'
+        ));
+
+        foreach (User::where('role', 'admin')->get() as $admin) {
+            $admin->notify(new InfoNotification(
+                "Commission de la villa « {$b->villa->title} » par {$host->name} : ".$this->eur($commission)." (réservation #{$b->id})."
+            ));
+        }
+    }
+
+    private function eur(float|int $n): string
+    {
+        return number_format($n, 2, ',', ' ').' €';
     }
 }

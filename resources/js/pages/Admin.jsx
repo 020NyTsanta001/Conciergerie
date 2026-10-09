@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { api, eur } from '../api';
+import { api, eur, STATUS } from '../api';
 
-const TABS = [['villas', 'Annonces'], ['client', 'Voyageurs'], ['host', 'Propriétaires'], ['activity', 'Activité']];
+const TABS = [['villas', 'Annonces'], ['bookings', 'Réservations'], ['commissions', 'Commissions'], ['client', 'Voyageurs'], ['host', 'Propriétaires'], ['activity', 'Activité']];
 const ROLE_DOT = { client: 'bg-sky-500', host: 'bg-amber-500', admin: 'bg-neutral-800' };
 const field = 'rounded-full border border-neutral-300 px-4 py-2.5 text-sm outline-none focus:border-black';
 
@@ -76,7 +76,7 @@ function PendingVillas() {
 
     return (
         <div>
-            <div className="mb-5 inline-flex rounded-full bg-neutral-100 p-1 text-xs font-medium">
+            <div className="mb-5 inline-flex rounded-full bg-neutral-100 p-1 max-w-full overflow-x-auto whitespace-nowrap text-xs font-medium">
                 {VILLA_STATUS.map(([key, label]) => (
                     <button
                         key={key}
@@ -222,6 +222,86 @@ function ActivityTab({ user, onClear }) {
     );
 }
 
+
+
+
+/* ---------- Virements aux hôtes + commission ---------- */
+function Stat({ label, value }) {
+    return (
+        <div className="rounded-2xl border border-neutral-200 p-4">
+            <p className="text-xs uppercase tracking-widest text-neutral-500">{label}</p>
+            <p className="mt-1 text-2xl font-semibold">{value}</p>
+        </div>
+    );
+}
+
+/* ---------- Réservations : suivi en lecture seule ---------- */
+const BOOKING_FILTERS = [
+    ['', 'Toutes'], ['pending_host', 'En attente du propriétaire'], ['validated', 'Validées'],
+    ['in_progress', 'En cours'], ['closed', 'Clôturées'], ['cancelled', 'Annulées'],
+];
+
+function BookingsOverview() {
+    const [items, setItems] = useState([]);
+    const [filter, setFilter] = useState('');
+    useEffect(() => { api('/bookings').then((r) => setItems(r.data)); }, []);
+
+    const shown = filter ? items.filter((b) => b.status === filter) : items;
+
+    return (
+        <div>
+            <p className="mb-4 text-sm text-neutral-500">
+                Suivi en lecture seule : chaque propriétaire approuve, démarre et clôture les séjours de ses villas.
+            </p>
+            <select className={`${field} mb-5`} value={filter} onChange={(e) => setFilter(e.target.value)}>
+                {BOOKING_FILTERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+
+            <div className="space-y-3">
+                {shown.length === 0 && <p className="text-neutral-500">Aucune réservation.</p>}
+                {shown.map((b) => {
+                    const [label, cls] = STATUS[b.status];
+                    return (
+                        <div key={b.id} className="flex flex-wrap items-center gap-4 rounded-2xl border border-neutral-200 p-4 text-sm">
+                            <div className="min-w-52 flex-1">
+                                <p className="font-semibold">#{b.id} · {b.villa.title}</p>
+                                <p className="text-neutral-500">{b.check_in} → {b.check_out} · client : {b.client.name}</p>
+                                <p>Total {eur(b.total_price)}</p>
+                            </div>
+                            <span className={`rounded-full px-3 py-1 text-xs font-medium ${cls}`}>{label}</span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+/* ---------- Commissions de la plateforme (15 %) ---------- */
+function CommissionsTab() {
+    const [data, setData] = useState(null);
+    useEffect(() => { api('/admin/payouts').then(setData); }, []);
+    if (!data) return null;
+
+    return (
+        <div>
+            <div className="mb-6 grid gap-3 sm:grid-cols-2">
+                <Stat label="Commissions encaissées (15 %)" value={eur(data.commission_total)} />
+                <Stat label="Séjours payés en intégralité" value={data.items.length} />
+            </div>
+            <div className="space-y-3">
+                {data.items.length === 0 && <p className="text-neutral-500">Aucune commission pour le moment : elles arrivent quand une réservation est payée en intégralité.</p>}
+                {data.items.map((p) => (
+                    <div key={p.id} className="rounded-2xl border border-neutral-200 p-4 text-sm">
+                        <p className="font-semibold">Commission de la villa « {p.villa_title} » par {p.host_name} : {eur(p.commission)}</p>
+                        <p className="text-neutral-500">Réservation #{p.booking_id} · total payé {eur(p.gross)} · {new Date(p.created_at).toLocaleDateString('fr-FR')}</p>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 /* ---------- Page ---------- */
 export default function Admin() {
     const [tab, setTab] = useState('villas');
@@ -248,6 +328,8 @@ export default function Admin() {
             {tab === 'villas' && <PendingVillas />}
             {(tab === 'client' || tab === 'host') && <UsersTab key={tab} role={tab} onActivity={openActivity} />}
             {tab === 'activity' && <ActivityTab user={activityUser} onClear={() => setActivityUser(null)} />}
+            {tab === 'bookings' && <BookingsOverview />}
+            {tab === 'commissions' && <CommissionsTab />}
         </div>
     );
 }
