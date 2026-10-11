@@ -43,6 +43,7 @@ class BookingController extends Controller
 
     public function quote(Request $request, PricingService $pricing)
     {
+        abort_if($request->user()->role === 'admin', 403, 'Le concierge ne réserve pas : connectez-vous avec un compte voyageur.');
         $data = $request->validate($this->rules());
         $villa = Villa::approved()->with('seasons')->findOrFail($data['villa_id']);
 
@@ -51,6 +52,7 @@ class BookingController extends Controller
 
     public function store(Request $request)
     {
+        abort_if($request->user()->role === 'admin', 403, 'Le concierge ne réserve pas : connectez-vous avec un compte voyageur.');
         $data = $request->validate($this->rules());
 
         return (new BookingResource($this->bookings->create($request->user(), $data)))
@@ -60,7 +62,7 @@ class BookingController extends Controller
         public function status(Request $request, Booking $booking)
     {
         $action = $request->validate([
-            'action' => 'required|in:validate,start,close,cancel,confirm_onsite',
+            'action' => 'required|in:validate,start,close,cancel,confirm_onsite,refund',
         ])['action'];
         $booking->load('villa');
 

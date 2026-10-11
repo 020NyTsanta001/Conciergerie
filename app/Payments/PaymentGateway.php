@@ -12,4 +12,7 @@ interface PaymentGateway
      * Doit lever une ValidationException si le paiement échoue.
      */
     public function charge(User $payer, int $amountAr, string $description, ?int $bookingId = null): PaymentResult;
+
+    /** Rembourse $amountAr à $payer (le voyageur qui avait payé). */
+    public function refund(User $payer, int $amountAr, string $description, ?int $bookingId = null): PaymentResult;
 }

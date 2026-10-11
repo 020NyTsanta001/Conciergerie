@@ -17,4 +17,11 @@ class WalletGateway implements PaymentGateway
 
         return new PaymentResult('WAL-'.Str::upper(Str::random(8)));
     }
+
+    public function refund(User $payer, int $amountAr, string $description, ?int $bookingId = null): PaymentResult
+    {
+        $this->wallet->credit($payer, $amountAr, 'refund', $description, $bookingId);
+
+        return new PaymentResult('REF-'.Str::upper(Str::random(8)));
+    }
 }

@@ -58,8 +58,12 @@ export default function Host() {
         };
         try {
             if (editing) {
-                await api(`/host/properties/${editing.id}`, { method: 'PUT', body });
-                setMsg('Villa modifiée.');
+                const r = await api(`/host/properties/${editing.id}`, { method: 'PUT', body });
+                setMsg(
+                    r.data.status === 'pending'
+                        ? 'Villa modifiée : elle est retirée du site et renvoyée en modération. Elle réapparaîtra après approbation.'
+                        : 'Aucun changement à enregistrer.'
+                );
             } else {
                 await api('/host/properties', { method: 'POST', body });
                 setMsg('Villa soumise : en attente de validation par un concierge.');

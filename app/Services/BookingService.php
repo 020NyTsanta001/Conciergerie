@@ -8,6 +8,7 @@ use App\Models\Booking;
 use App\Models\Payout;
 use App\Models\User;
 use App\Models\Villa;
+use App\Models\ActivityLog;
 use App\Notifications\InfoNotification;
 use App\Payments\PaymentGateway;
 use App\Support\Money;
@@ -85,13 +86,23 @@ class BookingService
         // L'admin ne gère aucune réservation : il les consulte seulement.
         $isOwner = $b->villa->owner_id === $u->id;
         $isClient = $b->user_id === $u->id;
+        $beforeAnyPayment = in_array($b->status, [S::Submitted, S::PendingHost, S::Validated], true);
 
         return match ($to) {
             S::Validated, S::InProgress, S::Closed => $isOwner,
             S::BalancePaid => $isOwner && $b->balance_method === 'on_site', // validation du paiement reçu sur place
-            S::Cancelled => $isOwner || ($isClient && in_array($b->status, [S::Submitted, S::PendingHost, S::Validated], true)),
+            // annulation simple : seulement tant qu'aucun argent n'est versé (après l'acompte : remboursement par l'hôte)
+            S::Cancelled => $beforeAnyPayment && ($isOwner || $isClient),
             default => false,
         };
+    }
+
+    /** Remboursement de l'acompte : réservé à l'hôte, avant la date de séjour, tant que le solde n'est pas payé. */
+    public function canRefund(User $u, Booking $b): bool
+    {
+        return $b->status === S::DepositPaid
+            && $b->villa->owner_id === $u->id
+            && Carbon::today()->lt($b->check_in);   // la date du séjour atteinte = plus de remboursement
     }
 
     public function actionsFor(User $u, Booking $b): array
@@ -102,6 +113,9 @@ class BookingService
         ];
         $actions = array_keys(array_filter($map, fn ($to) => $this->can($u, $b, $to)));
 
+        if ($this->canRefund($u, $b)) {
+            $actions[] = 'refund';
+        }
         if ($b->user_id === $u->id) {
             if ($b->status === S::Validated) $actions[] = 'pay_deposit';
             if ($b->status === S::DepositPaid) $actions[] = 'pay_balance';
@@ -112,6 +126,10 @@ class BookingService
 
     public function transition(User $u, Booking $b, string $action): Booking
     {
+        if ($action === 'refund') {
+            return $this->refundDeposit($u, $b);
+        }
+
         $to = [
             'validate' => S::Validated, 'confirm_onsite' => S::BalancePaid,
             'start' => S::InProgress, 'close' => S::Closed, 'cancel' => S::Cancelled,
@@ -128,6 +146,40 @@ class BookingService
         }
 
         $b->update(['status' => $to]);
+
+        return $b;
+    }
+
+    /** L'hôte rembourse l'acompte (jamais la totalité) avant la date de séjour : la réservation est annulée et les dates sont libérées. */
+    private function refundDeposit(User $u, Booking $b): Booking
+    {
+        $b->loadMissing('villa.owner', 'user');
+
+        abort_unless($b->villa->owner_id === $u->id, 403, "Seul le propriétaire de la villa peut rembourser l'acompte.");
+
+        if ($b->status !== S::DepositPaid) {
+            throw ValidationException::withMessages(['refund' => "Aucun acompte remboursable : le remboursement ne couvre que l'acompte, tant que le solde n'est pas payé."]);
+        }
+        if (! Carbon::today()->lt($b->check_in)) {
+            throw ValidationException::withMessages(['refund' => "Remboursement impossible : la date du séjour est atteinte. L'acompte reste acquis et la villa reste indisponible pour ces dates."]);
+        }
+
+        $amount = (int) $b->deposit_amount;
+
+        DB::transaction(function () use ($u, $b, $amount) {
+            // l'hôte rend l'acompte qu'il avait reçu ; le voyageur le récupère
+            $this->wallet->debit($u, $amount, 'refund', "Remboursement acompte réservation #{$b->id}", $b->id,
+                "Votre solde est insuffisant pour rembourser l'acompte (".Money::format($amount).').');
+            $this->gateway->refund($b->user, $amount, "Remboursement acompte réservation #{$b->id}", $b->id);
+
+            $b->update(['status' => S::Cancelled, 'paid_amount' => max(0, $b->paid_amount - $amount)]);
+
+            $b->user->notify(new InfoNotification(
+                "Votre acompte de ".Money::format($amount)." pour la réservation #{$b->id} (« {$b->villa->title} ») a été remboursé par le propriétaire. La réservation est annulée."
+            ));
+        });
+
+        ActivityLog::record($u, 'booking_refund', "a remboursé l'acompte de ".Money::format($amount)." (réservation #{$b->id})");
 
         return $b;
     }

@@ -154,7 +154,7 @@ function UsersTab({ role, onActivity }) {
                                 {u.name}
                                 {u.suspended && <span className="ml-2 rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">Suspendu</span>}
                             </p>
-                            <p className="text-neutral-500">{u.email}{u.phone ? ` · ${u.phone}` : ''}</p>
+                            <p className=" break-words text-neutral-500">{u.email}{u.phone ? ` · ${u.phone}` : ''}</p>
                             <p className="text-neutral-500">
                                 Inscrit le {fmtDate(u.created_at)} · {role === 'host' ? `${u.villas_count} villa(s)` : `${u.bookings_count} réservation(s)`}
                             </p>
@@ -253,7 +253,7 @@ function BookingsOverview() {
             <p className="mb-4 text-sm text-neutral-500">
                 Suivi en lecture seule : chaque propriétaire approuve, démarre et clôture les séjours de ses villas.
             </p>
-            <select className={`${field} mb-5`} value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <select className={`${field} mb-5 w-full sm:w-auto`} value={filter} onChange={(e) => setFilter(e.target.value)}>
                 {BOOKING_FILTERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
 
@@ -313,12 +313,12 @@ export default function Admin() {
         <div className="mx-auto max-w-5xl px-5 py-12">
             <h1 className="mb-6 text-4xl tracking-tight">Espace concierge</h1>
 
-            <div className="mb-8 inline-flex rounded-full bg-neutral-100 p-1 text-sm font-medium">
+            <div className="mb-8 grid grid-cols-3 gap-1 rounded-3xl bg-neutral-100 p-1 text-xs font-medium sm:grid-cols-6 sm:rounded-full md:text-sm">
                 {TABS.map(([key, label]) => (
                     <button
                         key={key}
                         onClick={() => { if (key !== 'activity') setActivityUser(null); setTab(key); }}
-                        className={`rounded-full px-5 py-2 transition-colors ${tab === key ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'}`}
+                        className={`rounded-full px-2 py-2.5 text-center transition-colors ${tab === key ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'}`}
                     >
                         {label}
                     </button>

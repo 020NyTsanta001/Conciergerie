@@ -8,6 +8,8 @@ use App\Models\Villa;
 use App\Services\VillaService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Models\User;
+use App\Notifications\InfoNotification;
 
 class HostController extends Controller
 {
@@ -68,26 +70,38 @@ class HostController extends Controller
         return (new VillaResource($villa->load('images')))->response()->setStatusCode(201);
     }
 
-    /** PUT /host/properties/{villa} : réservé au créateur */
+    /** PUT /host/properties/{villa} : réservé au créateur. Toute modification renvoie la villa en modération. */
     public function update(Request $request, Villa $villa)
     {
         abort_unless($villa->owner_id === $request->user()->id, 403, 'Seul le créateur de la villa peut la modifier.');
 
         [$attributes, $images] = $this->validated($request);
 
-        if ($villa->status === 'rejected') {
-            $attributes['status'] = 'pending'; // une annonce rejetée puis modifiée est soumise à nouveau
-        }
-        $villa->update($attributes);
+        $villa->fill($attributes);
+        $imagesChanged = $images !== null && $images !== $villa->images()->pluck('url')->all();
+        $modified = $villa->isDirty() || $imagesChanged;
 
-        if ($images !== null) {                      // liste de photos fournie : elle remplace l'ancienne
+        if ($modified) {
+            $villa->status = 'pending'; // la villa quitte le site jusqu'à nouvelle approbation
+        }
+        $villa->save();
+
+        if ($imagesChanged) {
             $villa->images()->delete();
             foreach ($images as $i => $url) {
                 $villa->images()->create(['url' => $url, 'position' => $i]);
             }
         }
 
-        ActivityLog::record($request->user(), 'villa_updated', "a modifié la villa « {$villa->title} »");
+        if ($modified) {
+            ActivityLog::record($request->user(), 'villa_updated', "a modifié la villa « {$villa->title} » (renvoyée en modération)");
+
+            foreach (User::where('role', 'admin')->get() as $admin) {
+                $admin->notify(new InfoNotification(
+                    "La villa « {$villa->title} » de {$request->user()->name} a été modifiée : elle attend une nouvelle approbation."
+                ));
+            }
+        }
 
         return new VillaResource($villa->load(['images', 'seasons']));
     }
@@ -114,6 +128,7 @@ class HostController extends Controller
 
         $villa->seasons()->sync(collect($rows)->mapWithKeys(fn ($r) => [$r['season_id'] => ['price_per_night' => $r['price_per_night']]]));
 
+        $villa->update(['status' => 'pending']);
         return new VillaResource($villa->load(['images', 'seasons']));
     }
 }

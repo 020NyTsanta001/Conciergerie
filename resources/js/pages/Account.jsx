@@ -6,7 +6,7 @@ import { USD_RATE } from '../money';
 
 const field = 'w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-black';
 const btn = 'rounded-full bg-black px-6 py-3 text-sm font-semibold text-white disabled:opacity-50';
-const TYPE_LABEL = { reward: 'Bonus', payment: 'Paiement', receipt: 'Encaissement', commission: 'Commission' };
+const TYPE_LABEL = { reward: 'Bonus', payment: 'Paiement', receipt: 'Encaissement', commission: 'Commission', refund: 'Remboursement'};
 const REWARD_LABEL = { about: 'À propos de moi', github: 'Mon GitHub', org_github: "GitHub de l'entreprise", cv: 'Mon CV' };
 
 function Msg({ m }) {

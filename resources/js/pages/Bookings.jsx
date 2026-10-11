@@ -11,6 +11,7 @@ const ACTIONS = {
     start: ['Démarrer le séjour', 'bg-emerald-600 text-white'],
     close: ['Clôturer', 'bg-neutral-700 text-white'],
     cancel: ['Annuler / refuser', 'border border-rose-300 text-rose-700'],
+    refund: ["Rembourser l'acompte", 'border border-amber-400 text-amber-800'],
 };
 
 export default function Bookings() {
@@ -21,6 +22,7 @@ export default function Bookings() {
     const [error, setError] = useState('');
     const [pay, setPay] = useState(null);       // { booking, kind } : fenêtre de paiement du voyageur
     const [onsite, setOnsite] = useState(null); // réservation dont l'hôte valide le paiement reçu sur place
+    const [refund, setRefund] = useState(null); // réservation dont l'hôte confirme le remboursement
 
     const load = () => {
         api('/bookings').then((r) => setItems(r.data));
@@ -38,6 +40,7 @@ export default function Bookings() {
             await api(`/bookings/${b.id}/status`, { method: 'PATCH', body: { action } });
             load();
         } catch (e) { setError(e.message); }
+        if (action === 'refund') return setRefund(b);
     };
 
     const confirmOnsite = async () => {
@@ -47,6 +50,15 @@ export default function Bookings() {
             load();
         } catch (e) { setError(e.message); }
         setOnsite(null);
+    };
+    
+    const confirmRefund = async () => {
+        try {
+            await api(`/bookings/${refund.id}/status`, { method: 'PATCH', body: { action: 'refund' } });
+            await refresh();
+            load();
+        } catch (e) { setError(e.message); }
+        setRefund(null);
     };
 
     return (
@@ -90,6 +102,10 @@ export default function Bookings() {
                                 <p className="mt-1">Total {eur(b.total_price)} · payé {eur(b.paid_amount)}</p>
                                 {b.status === 'deposit_paid' && b.balance_method === 'on_site' && (
                                     <p className="mt-1 text-amber-700">Solde de {eur(b.total_price - b.deposit_amount)} à régler sur place au début du séjour.</p>
+                                    
+                                )}
+                                {user.role === 'client' && b.status === 'deposit_paid' && (
+                                    <p className="mt-1 text-neutral-500">L'acompte n'est remboursable que par le propriétaire, avant la date du séjour.</p>
                                 )}
                                 <span className={`mt-2 inline-block rounded-full px-3 py-1 text-xs font-medium ${cls}`}>{label}</span>
                             </div>
@@ -101,6 +117,21 @@ export default function Bookings() {
                         </div>
                     );
                 })}
+            {refund && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-5" onClick={() => setRefund(null)}>
+                    <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        <p className="text-lg font-semibold">Rembourser l'acompte de {eur(refund.deposit_amount)} ?</p>
+                        <p className="mt-3 text-sm text-neutral-600">
+                            Réservation #{refund.id} : l'acompte est repris sur votre solde et rendu au voyageur. La réservation sera annulée
+                            et la villa redeviendra disponible pour ces dates. Cette action est irréversible.
+                        </p>
+                        <div className="mt-8 flex justify-end gap-3">
+                            <button onClick={() => setRefund(null)} className="rounded-full border border-neutral-300 px-5 py-2.5 text-sm">Annuler</button>
+                            <button onClick={confirmRefund} className="rounded-full bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white">Oui, rembourser</button>
+                        </div>
+                    </div>
+                </div>
+            )}
             </div>
 
             {pay && (

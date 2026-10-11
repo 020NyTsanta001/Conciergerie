@@ -7,7 +7,7 @@ const field = 'rounded-xl border border-neutral-300 px-3 py-2.5 text-sm w-full o
 
 export default function VillaDetail() {
     const { id } = useParams();
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
     const nav = useNavigate();
     const [villa, setVilla] = useState(null);
     const [services, setServices] = useState([]);
@@ -28,7 +28,7 @@ export default function VillaDetail() {
 
     useEffect(() => {
         setQuote(null);
-        if (!user || !form.check_in || !form.check_out || form.check_out <= form.check_in) return;
+        if (!user || user.role === 'admin' || !form.check_in || !form.check_out || form.check_out <= form.check_in) return;
         api('/bookings/quote', { method: 'POST', body: payload() }).then(setQuote).catch((e) => setError(e.message));
     }, [form, picked, user]); // eslint-disable-line
 
@@ -89,9 +89,18 @@ export default function VillaDetail() {
                     </div>
                 )}
                 {error && <p className="text-sm text-rose-600">{error}</p>}
-                <button onClick={reserve} className="w-full rounded-full bg-black text-white py-3.5 text-sm font-semibold">
-                    {user ? 'Réserver' : 'Se connecter pour réserver'}
-                </button>
+                {user?.role === 'admin' ? (
+                    <button
+                        onClick={async () => { await logout(); nav('/login'); }}
+                        className="w-full rounded-full border border-neutral-300 py-3.5 text-sm font-semibold hover:bg-neutral-50"
+                    >
+                        Se connecter en tant que voyageur
+                    </button>
+                ) : (
+                    <button onClick={reserve} className="w-full rounded-full bg-black text-white py-3.5 text-sm font-semibold">
+                        {user ? 'Réserver' : 'Se connecter pour réserver'}
+                    </button>
+                )}
             </aside>
         </div>
     );
