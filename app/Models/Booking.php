@@ -29,4 +29,7 @@ class Booking extends Model
     {
         return $this->belongsToMany(Service::class)->withPivot('quantity', 'unit_price');
     }
+    public function review() {
+        return $this->hasOne(Review::class);
+    }
 }

@@ -30,7 +30,7 @@ class BookingController extends Controller
     public function index(Request $request)
     {
         $u = $request->user();
-        $q = Booking::with(['villa.images', 'user', 'services'])->latest();
+        $q = Booking::with(['villa.images', 'user', 'services', 'review'])->latest();
 
         if ($u->role === 'host') {
             $q->whereHas('villa', fn ($v) => $v->where('owner_id', $u->id));

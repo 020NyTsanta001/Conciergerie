@@ -146,6 +146,12 @@ class BookingService
         }
 
         $b->update(['status' => $to]);
+        if ($to === S::Closed) {
+            $b->loadMissing('user', 'villa');
+            $b->user->notify(new InfoNotification(
+                "Votre séjour à « {$b->villa->title} » est terminé : vous pouvez laisser un avis sur la page de la villa."
+            ));
+        }
 
         return $b;
     }

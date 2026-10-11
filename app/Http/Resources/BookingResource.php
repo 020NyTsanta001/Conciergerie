@@ -20,6 +20,7 @@ class BookingResource extends JsonResource
             'deposit_amount' => $this->deposit_amount,
             'paid_amount' => $this->paid_amount,
             'balance_method' => $this->balance_method,
+            'review' => $this->whenLoaded('review', fn () => $this->review ? ['id' => $this->review->id, 'rating' => $this->review->rating] : null),
             'villa' => new VillaResource($this->whenLoaded('villa')),
             'client' => $this->whenLoaded('user', fn () => ['id' => $this->user->id, 'name' => $this->user->name]),
             'services' => $this->whenLoaded('services', fn () => $this->services->map(fn ($s) => [

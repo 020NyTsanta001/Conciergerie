@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, eur } from '../api';
 import { useAuth } from '../auth';
+import Reviews from '../components/Reviews';
+import { Stars } from '../components/Stars';
 
 const field = 'rounded-xl border border-neutral-300 px-3 py-2.5 text-sm w-full outline-none focus:border-black';
 
@@ -15,6 +17,9 @@ export default function VillaDetail() {
     const [picked, setPicked] = useState({});
     const [quote, setQuote] = useState(null);
     const [error, setError] = useState('');
+    const [reviews, setReviews] = useState(null);
+    const loadReviews = () => api(`/properties/${id}/reviews`).then(setReviews).catch(() => {});
+    useEffect(() => { loadReviews(); }, [id]);
 
     useEffect(() => {
         api(`/properties/${id}`).then((r) => setVilla(r.data));
@@ -53,12 +58,18 @@ export default function VillaDetail() {
                 </div>
                 <h1 className="text-5xl tracking-tight mt-8">{villa.title}</h1>
                 <p className="text-neutral-500 mt-2">{villa.city}, {villa.country} · {villa.bedrooms} chambres · {villa.capacity} voyageurs{villa.has_pool && ' · Piscine'}</p>
+                {reviews?.count > 0 && (
+                    <p className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
+                        <Stars value={reviews.average} /> {reviews.average.toFixed(1)} · {reviews.count} avis
+                    </p>
+                )}
                 <p className="mt-6 text-neutral-700 leading-relaxed">{villa.description}</p>
                 {villa.seasons?.length > 0 && (
                     <div className="mt-8">
                         <h2 className="font-semibold mb-3">Tarifs saisonniers</h2>
                         <ul className="text-sm text-neutral-600 space-y-1">
                             {villa.seasons.map((s) => <li key={s.id}>{s.name} ({s.start_date} → {s.end_date}) : <b>{eur(s.price_per_night)}</b> / nuit</li>)}
+                            <Reviews villaId={villa.id} data={reviews} reload={loadReviews} />
                         </ul>
                     </div>
                 )}

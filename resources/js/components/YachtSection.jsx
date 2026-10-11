@@ -49,8 +49,8 @@ export default function YachtSection() {
         return (
             <section className="mx-auto max-w-7xl px-5 pb-24">
                 {Title}
-                <div className="grid items-center gap-8 md:grid-cols-2">
-                    <div className="aspect-[4/5] animate-pulse rounded-3xl bg-neutral-100" />
+                <div className="grid items-center gap-8 md:grid-cols-[26rem_1fr] lg:grid-cols-[26rem_1fr]">
+                    <div className="aspect-[5/4] animate-pulse rounded-3xl bg-neutral-100" />
                     <div className="h-48 animate-pulse rounded-3xl bg-neutral-100" />
                 </div>
             </section>
@@ -62,8 +62,8 @@ export default function YachtSection() {
         return (
             <section className="mx-auto max-w-7xl px-5 pb-24">
                 {Title}
-                <div className="grid items-stretch gap-8 md:grid-cols-2">
-                    <div className="flex aspect-[4/5] items-center justify-center rounded-3xl border border-dashed border-neutral-300 bg-neutral-50 px-8 text-center">
+                <div className="grid items-stretch gap-8 md:grid-cols-[26rem_1fr] lg:grid-cols-[26rem_1fr]">
+                    <div className="flex aspect-[5/4] items-center justify-center rounded-3xl border border-dashed border-neutral-300 bg-neutral-50 px-8 text-center">
                         <p className="text-sm uppercase tracking-[0.25em] text-neutral-400">Aucune sortie disponible pour le moment</p>
                     </div>
 
@@ -85,11 +85,11 @@ export default function YachtSection() {
     return (
         <section className="mx-auto max-w-7xl px-5 pb-24">
             {Title}
-            <div className="grid items-center gap-8 md:grid-cols-2">
+            <div className="grid items-center gap-8 md:grid-cols-[26rem_1fr] lg:grid-cols-[26rem_1fr]">
                 {/* Gauche : carte qui défile vers la droite */}
                 <div className="overflow-hidden rounded-3xl bg-neutral-200">
                     <div
-                        className="flex aspect-[4/5]"
+                        className="flex aspect-[5/4]"
                         style={{ transform: `translateX(-${i * 100}%)`, transition: anim ? 'transform 700ms ease-in-out' : 'none' }}
                         onTransitionEnd={onTrackEnd}
                     >
@@ -98,8 +98,8 @@ export default function YachtSection() {
                                 <img src={y.image} alt={y.name} className="absolute inset-0 h-full w-full object-cover" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-transparent" />
                                 <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-neutral-900">Yacht</span>
-                                <div className="absolute bottom-0 p-6 text-white">
-                                    <p className="text-2xl font-semibold">{y.name}</p>
+                                <div className="absolute bottom-0 p-5 text-white">
+                                    <p className="text-xl font-semibold">{y.name}</p>
                                     <p className="text-sm text-white/80">Depuis {y.villa_title} · {y.city}</p>
                                 </div>
                             </Link>

@@ -15,6 +15,7 @@ use App\Http\Controllers\AdminActivityController;
 use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\PayoutController;
 use App\Http\Controllers\WalletController;
+use App\Http\Controllers\ReviewController;
 
 Route::prefix('v1')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
@@ -23,6 +24,7 @@ Route::prefix('v1')->group(function () {
     Route::get('stats', StatsController::class);
     Route::get('properties', [VillaController::class, 'index']);
     Route::get('properties/{villa}', [VillaController::class, 'show']);
+    Route::get('properties/{villa}/reviews', [ReviewController::class, 'index']);
     Route::get('seasons', [VillaController::class, 'seasons']);
     Route::get('yachts', [VillaController::class, 'yachts']);
     Route::get('services', [ServiceController::class, 'index']);
@@ -36,6 +38,9 @@ Route::prefix('v1')->group(function () {
         Route::patch('account/currency', [AccountController::class, 'updateCurrency']);
         Route::get('wallet', [WalletController::class, 'show']);
         Route::post('wallet/claim', [WalletController::class, 'claim']);
+        Route::post('bookings/{booking}/review', [ReviewController::class, 'store']);
+        Route::put('reviews/{review}', [ReviewController::class, 'update']);
+        Route::delete('reviews/{review}', [ReviewController::class, 'destroy']);
 
         Route::get('bookings', [BookingController::class, 'index']);
         Route::post('bookings/quote', [BookingController::class, 'quote']);

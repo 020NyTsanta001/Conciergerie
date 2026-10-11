@@ -41,4 +41,7 @@ class Villa extends Model
                     ->where('check_out', '>', $f['available_from']));
             });
     }
+    public function Review() {
+        return $this->hasMany(Review::class);
+    }
 }
