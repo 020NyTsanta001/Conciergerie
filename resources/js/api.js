@@ -32,8 +32,7 @@ export async function api(path, { method = 'GET', body, params } = {}) {
     return data;
 }
 
-export const eur = (n) =>
-    new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n ?? 0);
+export { money as eur } from './money';
 
 export const STATUS = {
     submitted: ['Soumise', 'bg-neutral-100 text-neutral-700'],

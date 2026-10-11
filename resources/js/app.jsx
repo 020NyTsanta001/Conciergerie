@@ -14,6 +14,8 @@ import Bookings from './pages/Bookings';
 import Host from './pages/Host';
 import Admin from './pages/Admin';
 import Account from './pages/Account';
+import { Fragment } from 'react';
+import { setCurrency } from './money';
 
 
 function Protected({ roles, children }) {
@@ -22,6 +24,14 @@ function Protected({ roles, children }) {
     if (!user) return <Navigate to="/login" replace />;
     if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
     return children;
+}
+
+// Quand la monnaie du compte change, l'affichage est remonté : tous les prix se recalculent
+function MoneyBoundary({ children }) {
+    const { user } = useAuth();
+    const currency = user?.currency === 'USD' ? 'USD' : 'MGA';
+    setCurrency(currency);
+    return <Fragment key={currency}>{children}</Fragment>;
 }
 
 // Une seule racine React, même si ce fichier est ré-exécuté par le rechargement à chaud de Vite
@@ -33,21 +43,22 @@ root.render(
         <BrowserRouter>
             <AuthProvider>
                 <Preloader />
-                <Routes>
+                <MoneyBoundary>
+                    <Routes>
                     <Route element={<Layout />}>
                         <Route path="/" element={<Home />} />
                         <Route path="/villas" element={<Villas />} />
                         <Route path="/villas/:id" element={<VillaDetail />} />
-                        <Route path="/login" element={<Login />} />
-                        
+                        <Route path="/login" element={<Login />} />  
                         <Route path="/bookings" element={<Protected><Bookings /></Protected>} />
                         <Route path="/account" element={<Protected roles={['client', 'host']}><Account /></Protected>} />
                         <Route path="/host" element={<Protected roles={['host']}><Host /></Protected>} />
-                        <Route path="/admin" element={<Protected roles={['admin']}><Admin /></Protected>} />
-                        
+                        <Route path="/admin" element={<Protected roles={['admin']}><Admin /></Protected>} />     
                     </Route>
                 </Routes>
+                </MoneyBoundary>
+                
             </AuthProvider>
         </BrowserRouter>
     </ErrorBoundary>
-);j
+);

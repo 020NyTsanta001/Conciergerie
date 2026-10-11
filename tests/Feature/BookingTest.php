@@ -39,6 +39,7 @@ class BookingTest extends TestCase
         $client = $this->user('client');
         $admin = $this->user('admin');
         $villa = $this->villa($host);
+        $client->forceFill(['balance' => 5_000_000])->save();
 
         $id = $this->actingAs($client, 'sanctum')->postJson('/api/v1/bookings', [
             'villa_id' => $villa->id, 'check_in' => '2027-03-10', 'check_out' => '2027-03-12', 'guests' => 2,
@@ -48,25 +49,58 @@ class BookingTest extends TestCase
         $this->actingAs($admin, 'sanctum')->patchJson("/api/v1/bookings/{$id}/status", ['action' => 'validate'])->assertForbidden();
         $this->actingAs($host, 'sanctum')->patchJson("/api/v1/bookings/{$id}/status", ['action' => 'validate'])->assertJsonPath('data.status', 'validated');
 
+        // acompte : 30 % de 2000 = 600 Ar, versés à l'hôte, qui est seul notifié
         $this->actingAs($client, 'sanctum')->postJson("/api/v1/bookings/{$id}/pay", ['type' => 'deposit'])->assertJsonPath('booking.data.status', 'deposit_paid');
-        // l'acompte est notifié à l'hôte seulement
+        $this->assertSame(600, (int) $host->fresh()->balance);
         $this->assertSame(1, $host->notifications()->where('data', 'like', '%Acompte%')->count());
         $this->assertSame(0, $admin->notifications()->where('data', 'like', '%Acompte%')->count());
 
-        $this->actingAs($client, 'sanctum')->postJson("/api/v1/bookings/{$id}/pay", ['type' => 'balance'])->assertJsonPath('booking.data.status', 'balance_paid');
-
-        // payée en intégralité : 2000 € -> 15 % (300 €) pour l'admin, 85 % (1700 €) pour l'hôte au total
-        $this->assertDatabaseHas('payouts', [
-            'booking_id' => $id, 'host_id' => $host->id,
-            'gross' => 2000, 'commission' => 300, 'amount' => 1700, 'status' => 'paid',
-        ]);
-        $this->assertSame(1, $host->notifications()->where('data', 'like', '%Solde%')->count());
+        // solde payé avec le solde du compte : 1400 Ar -> l'hôte reçoit 1100 (1700 au total), l'admin 300
+        $this->actingAs($client, 'sanctum')->postJson("/api/v1/bookings/{$id}/pay", ['type' => 'balance', 'method' => 'wallet'])->assertJsonPath('booking.data.status', 'balance_paid');
+        $this->assertSame(5_000_000 - 2000, (int) $client->fresh()->balance);
+        $this->assertSame(1700, (int) $host->fresh()->balance);
+        $this->assertSame(300, (int) $admin->fresh()->balance);
+        $this->assertDatabaseHas('payouts', ['booking_id' => $id, 'gross' => 2000, 'commission' => 300, 'amount' => 1700]);
         $this->assertSame(1, $admin->notifications()->where('data', 'like', '%Commission%')->count());
 
         // l'admin ne démarre pas le séjour ; l'hôte démarre et clôture
         $this->actingAs($admin, 'sanctum')->patchJson("/api/v1/bookings/{$id}/status", ['action' => 'start'])->assertForbidden();
         $this->actingAs($host, 'sanctum')->patchJson("/api/v1/bookings/{$id}/status", ['action' => 'start'])->assertJsonPath('data.status', 'in_progress');
         $this->actingAs($host, 'sanctum')->patchJson("/api/v1/bookings/{$id}/status", ['action' => 'close'])->assertJsonPath('data.status', 'closed');
+    }
+
+    public function test_on_site_balance_does_not_debit_client_wallet(): void
+    {
+        $host = $this->user('host');
+        $client = $this->user('client');
+        $admin = $this->user('admin');
+        $villa = $this->villa($host);
+        $client->forceFill(['balance' => 5_000_000])->save();
+
+        $id = $this->actingAs($client, 'sanctum')->postJson('/api/v1/bookings', [
+            'villa_id' => $villa->id, 'check_in' => '2027-03-10', 'check_out' => '2027-03-12', 'guests' => 2,
+        ])->json('data.id');
+        $this->actingAs($host, 'sanctum')->patchJson("/api/v1/bookings/{$id}/status", ['action' => 'validate']);
+        $this->actingAs($client, 'sanctum')->postJson("/api/v1/bookings/{$id}/pay", ['type' => 'deposit']);
+
+        // le voyageur choisit de payer le solde sur place : rien n'est débité
+        $this->actingAs($client, 'sanctum')->postJson("/api/v1/bookings/{$id}/pay", ['type' => 'balance', 'method' => 'on_site'])->assertOk();
+        $this->assertSame(5_000_000 - 600, (int) $client->fresh()->balance);
+
+        // l'hôte valide la réception : réservation payée, commission prélevée chez l'hôte (600 - 300), 300 pour l'admin
+        $this->actingAs($host, 'sanctum')->patchJson("/api/v1/bookings/{$id}/status", ['action' => 'confirm_onsite'])->assertJsonPath('data.status', 'balance_paid');
+        $this->assertSame(5_000_000 - 600, (int) $client->fresh()->balance);
+        $this->assertSame(300, (int) $host->fresh()->balance);
+        $this->assertSame(300, (int) $admin->fresh()->balance);
+    }
+
+    public function test_bonus_can_be_claimed_only_once_per_account(): void
+    {
+        $client = $this->user('client');
+
+        $this->actingAs($client, 'sanctum')->postJson('/api/v1/wallet/claim', ['key' => 'cv'])->assertOk()->assertJsonPath('balance', 1_000_000);
+        $this->actingAs($client, 'sanctum')->postJson('/api/v1/wallet/claim', ['key' => 'cv'])->assertStatus(422);
+        $this->assertSame(1_000_000, (int) $client->fresh()->balance);
     }
 
     public function test_client_cannot_validate_own_booking(): void

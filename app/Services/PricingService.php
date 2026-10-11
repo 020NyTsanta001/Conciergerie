@@ -4,13 +4,14 @@ namespace App\Services;
 
 use App\Models\Service;
 use App\Models\Villa;
+use App\Support\Money;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
+
 
 /** Tarification dynamique : prix par nuit selon la saison (pivot villa_season) + services. */
 class PricingService
 {
-    public const DEPOSIT_RATE = 0.30;
 
     /** @param array<int, array{id:int, quantity?:int}> $serviceLines */
     public function quote(Villa $villa, Carbon $in, Carbon $out, array $serviceLines = []): array
@@ -36,16 +37,16 @@ class PricingService
             ]);
         $servicesTotal = $services->sum(fn ($s) => $s['quantity'] * $s['unit_price']);
 
-        $total = round($stay + $servicesTotal, 2);
+        $total = Money::round($stay + $servicesTotal);
 
         return [
             'nights' => $nights,
             'nights_count' => count($nights),
-            'stay_total' => round($stay, 2),
+            'stay_total' => Money::round($stay),
             'services' => $services->values()->all(),
-            'services_total' => round($servicesTotal, 2),
+            'services_total' => Money::round($servicesTotal),
             'total' => $total,
-            'deposit' => round($total * self::DEPOSIT_RATE, 2),
+            'deposit' => Money::deposit($total),
         ];
     }
 }

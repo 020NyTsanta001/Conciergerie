@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use Illuminate\Notifications\Notification;
 
+
 class InfoNotification extends Notification
 {
     public function __construct(public string $message) {}

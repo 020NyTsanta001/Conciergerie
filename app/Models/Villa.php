@@ -28,7 +28,7 @@ class Villa extends Model
     public function scopeFilter(Builder $q, array $f): Builder
     {
         return $q
-            ->when($f['city'] ?? null, fn ($q, $v) => $q->where('city', 'like', "%{$v}%"))
+            ->when($f['city'] ?? null, fn ($q, $v) => $q->whereRaw('LOWER(city) LIKE ?', ['%'.mb_strtolower($v).'%']))
             ->when($f['price_min'] ?? null, fn ($q, $v) => $q->where('price_per_night', '>=', $v))
             ->when($f['price_max'] ?? null, fn ($q, $v) => $q->where('price_per_night', '<=', $v))
             ->when($f['guests'] ?? null, fn ($q, $v) => $q->where('capacity', '>=', $v))

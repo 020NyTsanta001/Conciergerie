@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rule;
 
 class AccountController extends Controller
 {
@@ -65,5 +66,15 @@ class AccountController extends Controller
         });
 
         return response()->noContent();
+    }
+        /** PATCH /account/currency {currency: MGA|USD} : monnaie d'affichage (le concierge reste en Ar) */
+    public function updateCurrency(Request $request)
+    {
+        abort_if($request->user()->role === 'admin', 403, 'Le concierge travaille toujours en Ariary.');
+        $data = $request->validate(['currency' => ['required', Rule::in(config('money.currencies'))]]);
+
+        $request->user()->forceFill($data)->save();
+
+        return $request->user();
     }
 }

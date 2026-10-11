@@ -34,7 +34,7 @@ export function AuthProvider({ children }) {
     };
 
     return (
-        <Ctx.Provider value={{ user, setUser, ready, login: (b) => authenticate('/login', b), register: (b) => authenticate('/register', b), logout }}>
+        <Ctx.Provider value={{ user, setUser, ready, login: (b) => authenticate('/login', b), register: (b) => authenticate('/register', b), refresh: () => api('/me').then(setUser).catch(() => {}), logout }}>
             {children}
         </Ctx.Provider>
     );

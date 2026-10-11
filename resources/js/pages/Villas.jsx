@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import VillaCard from '../components/VillaCard';
+import { toAr, currencyLabel } from '../money';
 
 const field = 'rounded-full border border-neutral-300 px-4 py-2.5 text-sm outline-none focus:border-black';
 
@@ -11,7 +12,7 @@ export default function Villas() {
 
     const load = () => {
         setLoading(true);
-        api('/properties', { params: filters }).then((r) => setVillas(r.data)).finally(() => setLoading(false));
+        api('/properties', { params: {...filters, price_max: filters.price_max ? toAr(filters.price_max):''} }).then((r) => setVillas(r.data)).finally(() => setLoading(false));
     };
     useEffect(load, []); // eslint-disable-line
 
@@ -22,7 +23,7 @@ export default function Villas() {
             <h1 className="text-5xl tracking-tight mb-8">Nos <span className="italic font-extralight">propriétés</span></h1>
             <form onSubmit={(e) => { e.preventDefault(); load(); }} className="flex flex-wrap gap-3 mb-10">
                 <input className={field} placeholder="Ville" value={filters.city} onChange={set('city')} />
-                <input className={field} type="number" placeholder="Prix max / nuit" value={filters.price_max} onChange={set('price_max')} />
+                <input className={field} type="number" placeholder={'Prix max / Nuit (${currencylabel()}'} value={filters.price_max} onChange={set('price_max')} />
                 <input className={field} type="number" placeholder="Voyageurs" value={filters.guests} onChange={set('guests')} />
                 <input className={field} type="date" value={filters.available_from} onChange={set('available_from')} />
                 <input className={field} type="date" value={filters.available_to} onChange={set('available_to')} />

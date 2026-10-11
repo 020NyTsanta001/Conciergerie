@@ -14,7 +14,8 @@ class AdminUserController extends Controller
 
         return User::whereIn('role', $request->filled('role') ? [$request->query('role')] : ['client', 'host'])
             ->when($request->query('search'), fn ($q, $s) => $q->where(fn ($w) => $w
-                ->where('name', 'like', "%{$s}%")->orWhere('email', 'like', "%{$s}%")))
+            ->whereRaw('LOWER(name) LIKE ?', ['%'.mb_strtolower($s).'%'])
+            ->orWhereRaw('LOWER(email) LIKE ?', ['%'.mb_strtolower($s).'%'])))
             ->withCount(['villas', 'bookings'])
             ->latest()
             ->get()

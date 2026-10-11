@@ -57,9 +57,11 @@ class BookingController extends Controller
             ->response()->setStatusCode(201);
     }
 
-    public function status(Request $request, Booking $booking)
+        public function status(Request $request, Booking $booking)
     {
-        $action = $request->validate(['action' => 'required|in:validate,start,close,cancel'])['action'];
+        $action = $request->validate([
+            'action' => 'required|in:validate,start,close,cancel,confirm_onsite',
+        ])['action'];
         $booking->load('villa');
 
         return new BookingResource($this->bookings->transition($request->user(), $booking, $action)->load(['villa.images', 'user', 'services']));
@@ -67,9 +69,12 @@ class BookingController extends Controller
 
     public function pay(Request $request, Booking $booking)
     {
-        $type = $request->validate(['type' => 'required|in:deposit,balance'])['type'];
+        $data = $request->validate([
+            'type' => 'required|in:deposit,balance',
+            'method' => 'sometimes|in:wallet,on_site', // « on_site » : seulement pour le solde
+        ]);
         $booking->load('villa');
-        $result = $this->bookings->pay($request->user(), $booking, $type);
+        $result = $this->bookings->pay($request->user(), $booking, $data['type'], $data['method'] ?? 'wallet');
 
         return [
             'reference' => $result['reference'],

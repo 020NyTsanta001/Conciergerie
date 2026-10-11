@@ -17,7 +17,7 @@ class User extends Authenticatable
 
     protected function casts(): array
     {
-        return ['email_verified_at' => 'datetime', 'suspended_at' => 'datetime', 'password' => 'hashed'];
+        return ['email_verified_at' => 'datetime', 'suspended_at' => 'datetime', 'balance' => 'integer', 'password' => 'hashed'];
     }
 
     public function villas() { return $this->hasMany(Villa::class, 'owner_id'); }

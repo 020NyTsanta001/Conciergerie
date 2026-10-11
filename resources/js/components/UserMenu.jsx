@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
+import { eur } from '../api';
+
 
 export default function UserMenu({ transparent }) {
     const { user, logout } = useAuth();
@@ -46,6 +48,9 @@ export default function UserMenu({ transparent }) {
 
             {open && (
                 <div role="menu" className="absolute right-0 mt-2 w-52 overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-xl">
+                <div className="border-b border-neutral-100 px-5 py-3 text-xs text-neutral-500">
+                    Solde : <b className="text-neutral-900">{eur(user.balance)}</b>
+                </div>
                     {user.role !== 'admin' && (
                         <Link to="/account" role="menuitem" className="block px-5 py-3 text-sm hover:bg-neutral-50">Mon compte</Link>
                     )}

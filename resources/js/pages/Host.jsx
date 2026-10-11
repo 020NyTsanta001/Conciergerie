@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, eur } from '../api';
+import { toAr, fromAr, currencyLabel } from '../money';
 
 const field = 'rounded-xl border border-neutral-300 px-3 py-2.5 text-sm w-full outline-none focus:border-black';
 const empty = {
@@ -31,7 +32,7 @@ export default function Host() {
         setMsg('');
         setF({
             title: v.title, description: v.description, city: v.city, country: v.country,
-            price_per_night: v.price_per_night, bedrooms: v.bedrooms, capacity: v.capacity,
+            price_per_night: fromAr(v.price_per_night), bedrooms: v.bedrooms, capacity: v.capacity,
             has_pool: v.has_pool, has_yacht: v.has_yacht, image: v.images?.[0] ?? '',
             yacht_image: v.yacht_image ?? '', yacht_name: v.yacht_name ?? '', yacht_description: v.yacht_description ?? '',
             yacht_place1: v.yacht_places?.[0] ?? '', yacht_place2: v.yacht_places?.[1] ?? '',
@@ -48,7 +49,7 @@ export default function Host() {
         // en modification, la photo saisie remplace la 1re photo ; les autres photos de la villa sont conservées
         const others = editing ? (editing.images ?? []).slice(1) : [];
         const body = {
-            ...rest,
+            ...rest, price_per_night: toAr(rest.price_per_night),
             images: image ? [image, ...others] : others,
             yacht_image: f.has_yacht ? yacht_image : null,
             yacht_name: f.has_yacht ? yacht_name.trim() : null,
@@ -119,7 +120,7 @@ export default function Host() {
                 <div className="grid grid-cols-2 gap-3">
                     <input className={field} placeholder="Ville" value={f.city} onChange={set('city')} required />
                     <input className={field} placeholder="Pays" value={f.country} onChange={set('country')} required />
-                    <input className={field} type="number" placeholder="Prix / nuit (€)" value={f.price_per_night} onChange={set('price_per_night')} required />
+                    <input className={field} type="number" placeholder={'Prix / Nuit (${currencylabel()}'} value={f.price_per_night} onChange={set('price_per_night')} required />
                     <input className={field} type="number" min="1" placeholder="Chambres" value={f.bedrooms} onChange={set('bedrooms')} />
                     <input className={field} type="number" min="1" placeholder="Capacité" value={f.capacity} onChange={set('capacity')} />
                     <div className="flex items-center gap-5 text-sm">

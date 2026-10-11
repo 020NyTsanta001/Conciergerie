@@ -19,6 +19,7 @@ class BookingResource extends JsonResource
             'total_price' => $this->total_price,
             'deposit_amount' => $this->deposit_amount,
             'paid_amount' => $this->paid_amount,
+            'balance_method' => $this->balance_method,
             'villa' => new VillaResource($this->whenLoaded('villa')),
             'client' => $this->whenLoaded('user', fn () => ['id' => $this->user->id, 'name' => $this->user->name]),
             'services' => $this->whenLoaded('services', fn () => $this->services->map(fn ($s) => [

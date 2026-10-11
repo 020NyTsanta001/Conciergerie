@@ -1,46 +1,76 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../api';
+import { api, eur } from '../api';
+import { useAuth } from '../auth';
 
-
+// ⚠️ À renseigner : adresse du GitHub de l'entreprise (stage). Vide = bouton grisé, sans bonus.
 const LINKS = {
     github: 'https://github.com/020NyTsanta001',
-    orgGithub: 'https://github.com/MIT452', 
+    orgGithub: 'https://github.com/020NyTsanta001', // '
     cv: '/cv.pdf',  // fichier à placer dans public/cv.pdf
 };
-const PHOTO = '/images/profile.webp';
+const PHOTO = '/images/profile.jpg';
 
 const field = 'w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-black';
 
-function LinkButton({ to, href, primary = false, children }) {
-    const base = 'flex w-full items-center justify-between rounded-full px-5 py-3.5 text-sm font-semibold transition-colors';
+function LinkButton({ to, href, primary = false, reward, claimed, onVisit, children }) {
+    const base = 'flex w-full items-center justify-between gap-2 rounded-full px-5 py-3.5 text-sm font-semibold transition-colors';
     const style = primary
         ? 'bg-black text-white hover:bg-neutral-800'
         : 'border border-neutral-300 text-neutral-900 hover:bg-neutral-50';
 
+    const tag = reward != null && (
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${claimed ? 'bg-emerald-100 text-emerald-700' : primary ? 'bg-white/20 text-white' : 'bg-neutral-100 text-neutral-600'}`}>
+            {claimed ? '✓ reçu' : `+${eur(reward)}`}
+        </span>
+    );
+
     if (to) {
-        return <Link to={to} className={`${base} ${style}`}>{children}<span aria-hidden="true">→</span></Link>;
+        return <Link to={to} onClick={onVisit} className={`${base} ${style}`}><span className="flex-1 text-left">{children}</span>{tag}<span aria-hidden="true">→</span></Link>;
     }
     if (!href) {
         return (
             <span title="Lien bientôt disponible" className={`${base} cursor-not-allowed border border-dashed border-neutral-300 text-neutral-400`}>
-                {children}<span aria-hidden="true">…</span>
+                <span className="flex-1 text-left">{children}</span><span aria-hidden="true">…</span>
             </span>
         );
     }
     return (
-        <a href={href} target="_blank" rel="noopener noreferrer" className={`${base} ${style}`}>
-            {children}<span aria-hidden="true">↗</span>
+        <a href={href} target="_blank" rel="noopener noreferrer" onClick={onVisit} className={`${base} ${style}`}>
+            <span className="flex-1 text-left">{children}</span>{tag}<span aria-hidden="true">↗</span>
         </a>
     );
 }
 
 export default function ContactSection() {
+    const { user, refresh } = useAuth();
     const [f, setF] = useState({ name: '', email: '', subject: '', message: '' });
     const [status, setStatus] = useState({ type: '', text: '' });
     const [sending, setSending] = useState(false);
     const [photoOk, setPhotoOk] = useState(true);
+    const [wallet, setWallet] = useState(null);   // bonus disponibles et déjà récupérés
+    const [toast, setToast] = useState('');
     const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+
+    useEffect(() => {
+        if (user) api('/wallet').then(setWallet).catch(() => {});
+        else setWallet(null);
+    }, [user?.id]);
+
+    // Visite d'un lien : bonus de départ, une seule fois par bouton et par compte
+    const visit = (key) => async () => {
+        if (!user) { setToast('Connectez-vous pour recevoir un bonus à chaque visite.'); return; }
+        if (wallet?.claimed.includes(key)) return;
+        try {
+            const r = await api('/wallet/claim', { method: 'POST', body: { key } });
+            setWallet((w) => (w ? { ...w, claimed: [...w.claimed, key] } : w));
+            setToast(`+${eur(r.amount)} ajoutés à votre solde.`);
+            refresh();
+        } catch (e) { setToast(e.message); }
+    };
+
+    const reward = (key) => (wallet ? wallet.rewards[key] : undefined);
+    const claimed = (key) => !!wallet?.claimed.includes(key);
 
     const submit = async (e) => {
         e.preventDefault();
@@ -66,7 +96,6 @@ export default function ContactSection() {
             <div className="grid gap-6 lg:grid-cols-2">
                 {/* Gauche : carte divisée en deux (photo | liens) */}
                 <div className="grid overflow-hidden rounded-3xl border border-neutral-200 sm:grid-cols-2">
-                    {/* 1/2 : photo */}
                     <div className="relative min-h-[320px] bg-neutral-200 sm:min-h-full">
                         {photoOk ? (
                             <img
@@ -85,12 +114,14 @@ export default function ContactSection() {
                         </div>
                     </div>
 
-                    {/* 2/2 : boutons liens */}
                     <div className="flex flex-col justify-center gap-3 p-6">
-                        <LinkButton to="/" primary>À propos de moi</LinkButton>
-                        <LinkButton href={LINKS.github}>Mon GitHub</LinkButton>
-                        <LinkButton href={LINKS.orgGithub}>GitHub de l'entreprise (stage)</LinkButton>
-                        <LinkButton href={LINKS.cv}>Mon CV</LinkButton>
+                        <LinkButton to="/about" primary reward={reward('about')} claimed={claimed('about')} onVisit={visit('about')}>À propos de moi</LinkButton>
+                        <LinkButton href={LINKS.github} reward={reward('github')} claimed={claimed('github')} onVisit={visit('github')}>Mon GitHub</LinkButton>
+                        <LinkButton href={LINKS.orgGithub} reward={reward('org_github')} claimed={claimed('org_github')} onVisit={visit('org_github')}>GitHub de l'entreprise (stage)</LinkButton>
+                        <LinkButton href={LINKS.cv} reward={reward('cv')} claimed={claimed('cv')} onVisit={visit('cv')}>Mon CV</LinkButton>
+                        <p className="text-xs text-neutral-500">
+                            {toast || 'Chaque lien visité offre un bonus à votre solde (une fois par compte, connexion requise).'}
+                        </p>
                     </div>
                 </div>
 

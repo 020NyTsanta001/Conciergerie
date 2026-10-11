@@ -5,19 +5,23 @@ namespace App\Services;
 use App\Enums\BookingStatus as S;
 use App\Events\BookingSubmitted;
 use App\Models\Booking;
+use App\Models\Payout;
 use App\Models\User;
 use App\Models\Villa;
-use App\Models\Payout;
+use App\Notifications\InfoNotification;
+use App\Payments\PaymentGateway;
+use App\Support\Money;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use App\Notifications\InfoNotification;
 
 class BookingService
 {
-    public const COMMISSION_RATE = 0.15; // part de la plateforme (admin) sur une réservation payée en intégralité
-    public function __construct(private PricingService $pricing) {}
+    public function __construct(
+        private PricingService $pricing,
+        private PaymentGateway $gateway,  // encaissement du voyageur : simulé aujourd'hui, prestataire réel demain
+        private WalletService $wallet,    // soldes internes : hôte et plateforme
+    ) {}
 
     /**
      * Création atomique : le verrou (lockForUpdate) sur la villa sérialise les réservations
@@ -64,10 +68,14 @@ class BookingService
             return $booking;
         });
 
-        BookingSubmitted::dispatch($booking); // Diagramme de séquence : Event -> Listener -> Notifications
+        BookingSubmitted::dispatch($booking); // Event -> Listener -> Notifications
 
         return $booking->refresh()->load(['villa.images', 'user', 'services']);
     }
+
+    /* ------------------------------------------------------------------ */
+    /*  Droits : qui peut faire quoi                                       */
+    /* ------------------------------------------------------------------ */
 
     public function can(User $u, Booking $b, S $to): bool
     {
@@ -79,7 +87,8 @@ class BookingService
         $isClient = $b->user_id === $u->id;
 
         return match ($to) {
-            S::Validated, S::InProgress, S::Closed => $isOwner,   // le propriétaire approuve, démarre et clôture
+            S::Validated, S::InProgress, S::Closed => $isOwner,
+            S::BalancePaid => $isOwner && $b->balance_method === 'on_site', // validation du paiement reçu sur place
             S::Cancelled => $isOwner || ($isClient && in_array($b->status, [S::Submitted, S::PendingHost, S::Validated], true)),
             default => false,
         };
@@ -87,7 +96,10 @@ class BookingService
 
     public function actionsFor(User $u, Booking $b): array
     {
-        $map = ['validate' => S::Validated, 'start' => S::InProgress, 'close' => S::Closed, 'cancel' => S::Cancelled];
+        $map = [
+            'validate' => S::Validated, 'confirm_onsite' => S::BalancePaid,
+            'start' => S::InProgress, 'close' => S::Closed, 'cancel' => S::Cancelled,
+        ];
         $actions = array_keys(array_filter($map, fn ($to) => $this->can($u, $b, $to)));
 
         if ($b->user_id === $u->id) {
@@ -100,10 +112,19 @@ class BookingService
 
     public function transition(User $u, Booking $b, string $action): Booking
     {
-        $to = ['validate' => S::Validated, 'start' => S::InProgress, 'close' => S::Closed, 'cancel' => S::Cancelled][$action];
+        $to = [
+            'validate' => S::Validated, 'confirm_onsite' => S::BalancePaid,
+            'start' => S::InProgress, 'close' => S::Closed, 'cancel' => S::Cancelled,
+        ][$action];
 
         if (! $this->can($u, $b, $to)) {
             abort(403, "Action « {$action} » impossible depuis l'état « {$b->status->value} ».");
+        }
+
+        if ($action === 'confirm_onsite') {
+            $this->settleOnSite($b);
+
+            return $b;
         }
 
         $b->update(['status' => $to]);
@@ -111,68 +132,144 @@ class BookingService
         return $b;
     }
 
-        /** Paiement simulé : l'acompte (30 %) va à l'hôte ; le solde déclenche le règlement final 85 % / 15 %. */
-    public function pay(User $u, Booking $b, string $type): array
+    /* ------------------------------------------------------------------ */
+    /*  Paiements                                                          */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * $type   : 'deposit' (acompte) ou 'balance' (solde du séjour)
+     * $method : 'wallet' (mon solde) ou 'on_site' (solde payé sur place, seulement pour 'balance')
+     */
+    public function pay(User $u, Booking $b, string $type, string $method = 'wallet'): array
     {
         abort_unless($b->user_id === $u->id, 403, 'Réservation non associée à votre compte.');
+        $b->loadMissing('villa.owner');
 
-        [$from, $to, $amount] = $type === 'deposit'
-            ? [S::Validated, S::DepositPaid, $b->deposit_amount]
-            : [S::DepositPaid, S::BalancePaid, $b->total_price - $b->deposit_amount];
+        if ($type === 'deposit') {
+            if ($method !== 'wallet') {
+                throw ValidationException::withMessages(['method' => "L'acompte se paie depuis votre solde."]);
+            }
+            $this->requireStatus($b, S::Validated, 'acompte');
 
-        if ($b->status !== $from) {
-            throw ValidationException::withMessages(['type' => "Paiement « {$type} » impossible à ce stade."]);
+            return DB::transaction(function () use ($u, $b) {
+                $amount = (int) $b->deposit_amount;
+                $payment = $this->gateway->charge($u, $amount, "Acompte réservation #{$b->id}", $b->id);
+
+                // l'acompte va à l'hôte, et seul lui est notifié
+                $this->wallet->credit($b->villa->owner, $amount, 'receipt', "Acompte réservation #{$b->id}", $b->id);
+                $b->update(['status' => S::DepositPaid, 'paid_amount' => $b->paid_amount + $amount]);
+                $b->villa->owner->notify(new InfoNotification(
+                    "Acompte reçu pour la réservation #{$b->id} (« {$b->villa->title} ») : ".Money::format($amount).'.'
+                ));
+
+                return ['reference' => $payment->reference, 'amount' => $amount, 'booking' => $b];
+            });
         }
 
-        DB::transaction(function () use ($b, $to, $amount, $type) {
-            $b->update(['status' => $to, 'paid_amount' => $b->paid_amount + $amount]);
-            $b->loadMissing('villa.owner');
+        $this->requireStatus($b, S::DepositPaid, 'solde');
+        $balance = (int) ($b->total_price - $b->deposit_amount);
 
-            if ($type === 'deposit') {
-                // l'acompte va à l'hôte, et seul lui est notifié
-                $b->villa->owner->notify(new InfoNotification(
-                    "Acompte reçu pour la réservation #{$b->id} (« {$b->villa->title} ») : ".$this->eur($amount).'.'
-                ));
-            } else {
-                $this->settle($b);
-            }
+        if ($method === 'on_site') {
+            // paiement remis à l'hôte en main propre : rien n'est débité ; l'hôte valide à l'arrivée
+            $b->update(['balance_method' => 'on_site']);
+            $b->villa->owner->notify(new InfoNotification(
+                "Le voyageur paiera le solde de ".Money::format($balance)." sur place au début du séjour (réservation #{$b->id}). Validez la réception à son arrivée."
+            ));
+
+            return ['reference' => 'ON-SITE', 'amount' => 0, 'booking' => $b];
+        }
+
+        return DB::transaction(function () use ($u, $b, $balance) {
+            $payment = $this->gateway->charge($u, $balance, "Solde réservation #{$b->id}", $b->id);
+            $b->update(['status' => S::BalancePaid, 'paid_amount' => $b->total_price, 'balance_method' => 'wallet']);
+            $this->settleWallet($b);
+
+            return ['reference' => $payment->reference, 'amount' => $balance, 'booking' => $b];
         });
-
-        return ['reference' => 'FAKE-'.Str::upper(Str::random(8)), 'amount' => round($amount, 2), 'booking' => $b];
     }
 
-    /** Réservation payée en intégralité : 85 % du total à l'hôte (acompte compris), 15 % de commission à l'admin. */
-    private function settle(Booking $b): void
+    private function requireStatus(Booking $b, S $expected, string $label): void
     {
-        $host = $b->villa->owner;
-        $gross = (float) $b->total_price;
-        $commission = round($gross * self::COMMISSION_RATE, 2);
-        $hostShare = round($gross - $commission, 2);                       // 85 % pour l'hôte en tout
-        $hostBalance = round($hostShare - (float) $b->deposit_amount, 2);  // part reçue au moment du solde
+        if ($b->status !== $expected) {
+            throw ValidationException::withMessages(['type' => "Paiement « {$label} » impossible à ce stade."]);
+        }
+    }
 
-        Payout::firstOrCreate(['booking_id' => $b->id], [
-            'host_id' => $host->id,
-            'gross' => $gross,
-            'commission' => $commission,
-            'amount' => $hostShare,
-            'status' => 'paid',      // règlement simulé : instantané
-            'paid_at' => now(),
-        ]);
+    /* ------------------------------------------------------------------ */
+    /*  Répartition de l'argent d'un séjour payé en intégralité            */
+    /* ------------------------------------------------------------------ */
+
+    /** [total, commission plateforme, part de l'hôte] */
+    private function split(Booking $b): array
+    {
+        $gross = (int) $b->total_price;
+        $commission = Money::commission($gross);
+
+        return [$gross, $commission, $gross - $commission];
+    }
+
+    /** Solde payé depuis le compte du voyageur : l'hôte reçoit sa part (acompte déjà reçu), l'admin sa commission. */
+    private function settleWallet(Booking $b): void
+    {
+        [$gross, $commission, $hostShare] = $this->split($b);
+        $host = $b->villa->owner;
+        $hostBalance = $hostShare - (int) $b->deposit_amount;
+        $pct = (int) round((1 - config('money.commission_rate')) * 100);
+
+        $this->wallet->credit($host, $hostBalance, 'receipt', "Solde réservation #{$b->id}", $b->id);
+        $this->creditPlatform($b, $host, $commission);
+        $this->recordPayout($b, $host, $gross, $commission, $hostShare);
 
         $host->notify(new InfoNotification(
-            "Solde reçu pour la réservation #{$b->id} (« {$b->villa->title} ») : ".$this->eur($hostBalance).
-            '. Total reçu avec l\'acompte : '.$this->eur($hostShare).' (85 %).'
+            "Solde reçu pour la réservation #{$b->id} (« {$b->villa->title} ») : ".Money::format($hostBalance).
+            '. Total reçu avec l\'acompte : '.Money::format($hostShare)." ({$pct} %)."
         ));
+    }
 
-        foreach (User::where('role', 'admin')->get() as $admin) {
+    /** Solde payé sur place : le voyageur n'est pas débité ; la commission est prélevée sur le solde de l'hôte. */
+    private function settleOnSite(Booking $b): void
+    {
+        $b->loadMissing('villa.owner');
+        [$gross, $commission, $hostShare] = $this->split($b);
+        $host = $b->villa->owner;
+
+        DB::transaction(function () use ($b, $host, $gross, $commission, $hostShare) {
+            $this->wallet->debit($host, $commission, 'commission', "Commission réservation #{$b->id} (solde payé sur place)", $b->id,
+                'Solde insuffisant pour régler la commission de la plateforme ('.Money::format($commission).').');
+
+            $b->update(['status' => S::BalancePaid, 'paid_amount' => $gross]);
+            $this->creditPlatform($b, $host, $commission);
+            $this->recordPayout($b, $host, $gross, $commission, $hostShare);
+
+            $host->notify(new InfoNotification(
+                "Paiement sur place validé pour la réservation #{$b->id} : commission de ".Money::format($commission).' prélevée sur votre solde.'
+            ));
+        });
+    }
+
+    private function creditPlatform(Booking $b, User $host, int $commission): void
+    {
+        $admins = User::where('role', 'admin')->orderBy('id')->get();
+        if ($admins->isEmpty()) {
+            return;
+        }
+
+        // la commission est créditée au premier admin (compte de la plateforme) ; tous sont notifiés
+        $this->wallet->credit($admins->first(), $commission, 'commission',
+            "Commission villa « {$b->villa->title} » par {$host->name}", $b->id);
+
+        foreach ($admins as $admin) {
             $admin->notify(new InfoNotification(
-                "Commission de la villa « {$b->villa->title} » par {$host->name} : ".$this->eur($commission)." (réservation #{$b->id})."
+                "Commission de la villa « {$b->villa->title} » par {$host->name} : ".Money::format($commission)." (réservation #{$b->id})."
             ));
         }
     }
 
-    private function eur(float|int $n): string
+    private function recordPayout(Booking $b, User $host, int $gross, int $commission, int $hostShare): void
     {
-        return number_format($n, 2, ',', ' ').' €';
+        Payout::firstOrCreate(['booking_id' => $b->id], [
+            'host_id' => $host->id, 'gross' => $gross, 'commission' => $commission, 'amount' => $hostShare,
+            'status' => 'paid', 'paid_at' => now(),
+        ]);
     }
 }

@@ -116,10 +116,7 @@ export default function HeroScroll({ image, stats }) {
                     </div>
                 </div>
 
-                {/* indice de défilement, disparaît dès que l'animation démarre */}
-                <p className={`absolute bottom-6 left-1/2 -translate-x-1/2 text-xs uppercase tracking-[0.3em] text-white/80 transition-opacity duration-500 ${step === 0 ? 'opacity-100' : 'opacity-0'}`}>
-                    Défilez
-                </p>
+                
             </div>
         </section>
     );

@@ -14,6 +14,7 @@ use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AdminActivityController;
 use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\PayoutController;
+use App\Http\Controllers\WalletController;
 
 Route::prefix('v1')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
@@ -32,6 +33,9 @@ Route::prefix('v1')->group(function () {
         Route::patch('account/name', [AccountController::class, 'updateName']);
         Route::patch('account/password', [AccountController::class, 'updatePassword']);
         Route::delete('account', [AccountController::class, 'destroy']);
+        Route::patch('account/currency', [AccountController::class, 'updateCurrency']);
+        Route::get('wallet', [WalletController::class, 'show']);
+        Route::post('wallet/claim', [WalletController::class, 'claim']);
 
         Route::get('bookings', [BookingController::class, 'index']);
         Route::post('bookings/quote', [BookingController::class, 'quote']);

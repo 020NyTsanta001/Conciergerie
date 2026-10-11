@@ -54,7 +54,9 @@ class ActivityTracker
             $what = match ($b->status) {
                 BookingStatus::Validated => "a validé la réservation #{$b->id}",
                 BookingStatus::DepositPaid => "a payé l'acompte de la réservation #{$b->id}",
-                BookingStatus::BalancePaid => "a payé le solde de la réservation #{$b->id}",
+                BookingStatus::BalancePaid => $b->balance_method === 'on_site'
+                ? "a validé la réception du solde sur place (réservation #{$b->id})"
+                : "a payé le solde de la réservation #{$b->id}",
                 BookingStatus::InProgress => "a démarré le séjour de la réservation #{$b->id}",
                 BookingStatus::Closed => "a clôturé la réservation #{$b->id}",
                 BookingStatus::Cancelled => "a annulé la réservation #{$b->id}",
