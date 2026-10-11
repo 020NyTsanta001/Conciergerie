@@ -36,11 +36,11 @@ export default function Bookings() {
         if (action === 'pay_deposit') return setPay({ booking: b, kind: 'deposit' });
         if (action === 'pay_balance') return setPay({ booking: b, kind: 'balance' });
         if (action === 'confirm_onsite') return setOnsite(b);
+        if (action === 'refund') return setRefund(b); // la requête part seulement après confirmation (confirmRefund)
         try {
             await api(`/bookings/${b.id}/status`, { method: 'PATCH', body: { action } });
             load();
         } catch (e) { setError(e.message); }
-        if (action === 'refund') return setRefund(b);
     };
 
     const confirmOnsite = async () => {

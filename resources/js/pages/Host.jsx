@@ -124,7 +124,7 @@ export default function Host() {
                 <div className="grid grid-cols-2 gap-3">
                     <input className={field} placeholder="Ville" value={f.city} onChange={set('city')} required />
                     <input className={field} placeholder="Pays" value={f.country} onChange={set('country')} required />
-                    <input className={field} type="number" placeholder={'Prix / Nuit (${currencylabel()}'} value={f.price_per_night} onChange={set('price_per_night')} required />
+                    <input className={field} type="number" placeholder={`Prix / nuit (${currencyLabel()})`} value={f.price_per_night} onChange={set('price_per_night')} required />
                     <input className={field} type="number" min="1" placeholder="Chambres" value={f.bedrooms} onChange={set('bedrooms')} />
                     <input className={field} type="number" min="1" placeholder="Capacité" value={f.capacity} onChange={set('capacity')} />
                     <div className="flex items-center gap-5 text-sm">

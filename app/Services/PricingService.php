@@ -9,21 +9,18 @@ use Carbon\Carbon;
 use Carbon\CarbonPeriod;
 
 
-/** Tarification dynamique : prix par nuit selon la saison (pivot villa_season) + services. */
+/** Tarification : prix par nuit de la villa × nombre de nuits + services. */
 class PricingService
 {
-
     /** @param array<int, array{id:int, quantity?:int}> $serviceLines */
     public function quote(Villa $villa, Carbon $in, Carbon $out, array $serviceLines = []): array
     {
-        $seasons = $villa->seasons;
         $nights = [];
         $stay = 0.0;
 
         foreach (CarbonPeriod::create($in, $out->copy()->subDay()) as $day) {
-            $season = $seasons->first(fn ($s) => $day->between($s->start_date, $s->end_date));
-            $price = $season ? (float) $season->pivot->price_per_night : (float) $villa->price_per_night;
-            $nights[] = ['date' => $day->toDateString(), 'price' => $price, 'season' => $season?->name];
+            $price = (float) $villa->price_per_night;
+            $nights[] = ['date' => $day->toDateString(), 'price' => $price];
             $stay += $price;
         }
 

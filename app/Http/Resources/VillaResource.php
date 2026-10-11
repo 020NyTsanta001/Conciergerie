@@ -29,11 +29,6 @@ class VillaResource extends JsonResource
             'status' => $this->status,
             'images' => $this->whenLoaded('images', fn () => $this->images->pluck('url')),
             'owner' => $this->whenLoaded('owner', fn () => ['id' => $this->owner->id, 'name' => $this->owner->name]),
-            'seasons' => $this->whenLoaded('seasons', fn () => $this->seasons->map(fn ($s) => [
-                'id' => $s->id, 'name' => $s->name,
-                'start_date' => $s->start_date->toDateString(), 'end_date' => $s->end_date->toDateString(),
-                'price_per_night' => (float) $s->pivot->price_per_night,
-            ])),
         ];
     }
 }

@@ -16,6 +16,7 @@ import Admin from './pages/Admin';
 import Account from './pages/Account';
 import { Fragment } from 'react';
 import { setCurrency } from './money';
+import About from './pages/About';
 
 
 function Protected({ roles, children }) {
@@ -53,7 +54,8 @@ root.render(
                         <Route path="/bookings" element={<Protected><Bookings /></Protected>} />
                         <Route path="/account" element={<Protected roles={['client', 'host']}><Account /></Protected>} />
                         <Route path="/host" element={<Protected roles={['host']}><Host /></Protected>} />
-                        <Route path="/admin" element={<Protected roles={['admin']}><Admin /></Protected>} />     
+                        <Route path="/admin" element={<Protected roles={['admin']}><Admin /></Protected>} />  
+                        <Route path='/about' element={<About />} />   
                     </Route>
                 </Routes>
                 </MoneyBoundary>

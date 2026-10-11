@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Season;
 use App\Models\Service;
 use App\Models\User;
 use App\Models\Villa;
@@ -15,9 +14,6 @@ class DatabaseSeeder extends Seeder
         User::create(['name' => 'Concierge Admin', 'email' => 'admin@luxe.test', 'password' => 'password', 'role' => 'admin']);
         $host = User::create(['name' => 'Hélène Marchand', 'email' => 'host@luxe.test', 'password' => 'password', 'role' => 'host']);
         User::create(['name' => 'Victor Client', 'email' => 'client@luxe.test', 'password' => 'password', 'role' => 'client']);
-
-        $winter = Season::create(['name' => 'Fêtes de fin d\'année', 'start_date' => '2026-12-15', 'end_date' => '2027-01-05']);
-        $summer = Season::create(['name' => 'Haute saison été', 'start_date' => '2027-06-15', 'end_date' => '2027-09-15']);
 
         Service::insert([
             ['name' => 'Chef à domicile', 'type' => 'chef', 'description' => 'Dîner gastronomique pour toute la villa', 'price' => 450, 'is_active' => true, 'created_at' => now(), 'updated_at' => now()],
@@ -44,7 +40,6 @@ class DatabaseSeeder extends Seeder
             foreach ([1, 2, 3] as $p) {
                 $villa->images()->create(['url' => "https://picsum.photos/seed/villa{$i}-{$p}/1200/800", 'position' => $p]);
             }
-            $villa->seasons()->attach([$winter->id => ['price_per_night' => $price * 1.5], $summer->id => ['price_per_night' => $price * 1.25]]);
         }
     }
 }

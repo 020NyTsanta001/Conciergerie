@@ -18,12 +18,14 @@ export default function VillaDetail() {
     const [quote, setQuote] = useState(null);
     const [error, setError] = useState('');
     const [reviews, setReviews] = useState(null);
+    const [notFound, setNotFound] = useState(false);
     const loadReviews = () => api(`/properties/${id}/reviews`).then(setReviews).catch(() => {});
     useEffect(() => { loadReviews(); }, [id]);
 
     useEffect(() => {
-        api(`/properties/${id}`).then((r) => setVilla(r.data));
-        api('/services').then(setServices);
+        setNotFound(false);
+        api(`/properties/${id}`).then((r) => setVilla(r.data)).catch(() => setNotFound(true));
+        api('/services').then(setServices).catch(() => {});
     }, [id]);
 
     const payload = () => ({
@@ -33,6 +35,7 @@ export default function VillaDetail() {
 
     useEffect(() => {
         setQuote(null);
+        setError('');
         if (!user || user.role === 'admin' || !form.check_in || !form.check_out || form.check_out <= form.check_in) return;
         api('/bookings/quote', { method: 'POST', body: payload() }).then(setQuote).catch((e) => setError(e.message));
     }, [form, picked, user]); // eslint-disable-line
@@ -46,6 +49,7 @@ export default function VillaDetail() {
         } catch (e) { setError(e.message); }
     };
 
+    if (notFound) return <p className="p-10 text-neutral-500">Cette villa n'existe pas ou n'est plus disponible.</p>;
     if (!villa) return <p className="p-10 text-neutral-500">Chargement…</p>;
 
     return (
@@ -64,15 +68,7 @@ export default function VillaDetail() {
                     </p>
                 )}
                 <p className="mt-6 text-neutral-700 leading-relaxed">{villa.description}</p>
-                {villa.seasons?.length > 0 && (
-                    <div className="mt-8">
-                        <h2 className="font-semibold mb-3">Tarifs saisonniers</h2>
-                        <ul className="text-sm text-neutral-600 space-y-1">
-                            {villa.seasons.map((s) => <li key={s.id}>{s.name} ({s.start_date} → {s.end_date}) : <b>{eur(s.price_per_night)}</b> / nuit</li>)}
-                            <Reviews villaId={villa.id} data={reviews} reload={loadReviews} />
-                        </ul>
-                    </div>
-                )}
+                <Reviews villaId={villa.id} data={reviews} reload={loadReviews} />
             </div>
 
             <aside className="rounded-3xl border border-neutral-200 p-6 h-fit sticky top-24 space-y-4">

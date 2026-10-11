@@ -7,7 +7,7 @@ const PROFILES = {
         intro: 'De la première recherche à la clôture du séjour, tout se fait depuis votre espace.',
         cta: { to: '/villas', text: 'Découvrir les villas' },
         steps: [
-            { title: 'Choisir la villa idéale', text: "Filtrez par ville, budget, nombre de voyageurs, piscine ou disponibilité sur vos dates. Chaque fiche présente photos, description et tarifs par saison.", tags: ['Filtres avancés', 'Tarifs saisonniers'] },
+            { title: 'Choisir la villa idéale', text: "Filtrez par ville, budget, nombre de voyageurs, piscine ou disponibilité sur vos dates. Chaque fiche présente photos, description et avis des voyageurs.", tags: ['Filtres avancés', 'Avis des voyageurs'] },
             { title: 'Composer son séjour', text: "Choisissez vos dates et ajoutez des expériences : chef à domicile, chauffeur privé, sortie en yacht. Le devis se met à jour en direct.", tags: ['Devis instantané', 'Services exclusifs'] },
             { title: 'Valider et payer en deux temps', text: "Le propriétaire valide votre demande, puis vous réglez un acompte de 30 %. Le solde est payé avant l'arrivée.", tags: ['Acompte 30 %', 'Solde avant le séjour'] },
             { title: "Séjourner l'esprit libre", text: "Suivez l'état de votre réservation, de la demande jusqu'à la clôture du séjour, depuis votre espace personnel.", tags: ['Suivi des statuts', "Annulation avant l'acompte"] },
@@ -20,7 +20,7 @@ const PROFILES = {
         steps: [
             { title: 'Publier sa villa', text: "Décrivez votre bien, ajoutez vos photos, fixez le prix de base, le nombre de chambres et la capacité depuis votre espace propriétaire.", tags: ['Photos', 'Prix de base'] },
             { title: 'Passer la validation du concierge', text: "Chaque annonce est examinée par un concierge avant d'être visible : une garantie de qualité pour les voyageurs comme pour vous.", tags: ['Annonce vérifiée', 'Statut en attente → approuvée'] },
-            { title: 'Piloter ses tarifs saisonniers', text: "Un prix par nuit peut être défini pour chaque saison (fêtes de fin d'année, haute saison d'été…) : le total du séjour s'adapte automatiquement.", tags: ['Prix par saison', 'Calcul automatique'] },
+            { title: 'Proposer son yacht', text: "Ajoutez un yacht à votre fiche (nom, photo, description, lieux de sortie) : il est mis en avant dans la section Yachts de l'accueil.", tags: ['Yacht', "Visible sur l'accueil"] },
             { title: 'Gérer les demandes et encaisser', text: "Recevez une notification à chaque nouvelle demande, validez ou refusez, démarrez et clôturez le séjour, puis suivez les montants encaissés.", tags: ['Notifications', 'Revenus encaissés'] },
         ],
     },
@@ -31,8 +31,8 @@ const PROFILES = {
         steps: [
             { title: 'Examiner les annonces', text: "Les villas soumises par les propriétaires arrivent dans une file de modération, avec leurs photos, leur prix et leur propriétaire.", tags: ['File de modération'] },
             { title: 'Approuver ou rejeter', text: "Seules les annonces approuvées apparaissent dans le catalogue : vous garantissez le niveau d'exigence de la plateforme.", tags: ['Contrôle qualité'] },
-            { title: 'Superviser les réservations', text: "Une vue d'ensemble de toutes les réservations, avec leur statut, les montants et les services choisis par les voyageurs.", tags: ['Vue globale', 'Statuts'] },
-            { title: 'Intervenir à chaque étape', text: "Validez, démarrez ou clôturez un séjour, annulez si nécessaire ; chaque nouvelle demande génère une notification.", tags: ['Cycle de vie complet', 'Notifications'] },
+            { title: 'Superviser les réservations', text: "La page Réservations donne une vue d'ensemble de toutes les demandes, avec leur statut, les montants et les services choisis par les voyageurs.", tags: ['Vue globale', 'Statuts'] },
+            { title: 'Suivre commissions et comptes', text: "Consultez les commissions encaissées, suspendez un compte si nécessaire et suivez le journal d'activité de la plateforme.", tags: ['Commissions 15 %', "Journal d'activité"] },
         ],
     },
 };

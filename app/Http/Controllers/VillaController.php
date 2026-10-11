@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Resources\VillaResource;
-use App\Models\Season;
 use App\Models\Villa;
 use Illuminate\Http\Request;
 
@@ -41,16 +40,10 @@ class VillaController extends Controller
     {
         abort_unless($villa->status === 'approved', 404);
 
-        return new VillaResource($villa->load(['images', 'owner', 'seasons']));
+        return new VillaResource($villa->load(['images', 'owner']));
     }
 
-    public function seasons()
-    {
-        return Season::orderBy('start_date')->get();
-    }
-    
-
-        /** GET /yachts : jusqu'à 4 yachts au hasard, parmi les villas approuvées qui en ont un */
+    /** GET /yachts : jusqu'à 4 yachts au hasard, parmi les villas approuvées qui en ont un */
     public function yachts()
     {
         return Villa::approved()

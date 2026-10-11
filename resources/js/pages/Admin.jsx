@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { api, eur, STATUS } from '../api';
+import { api, eur } from '../api';
 
-const TABS = [['villas', 'Annonces'], ['bookings', 'Réservations'], ['commissions', 'Commissions'], ['client', 'Voyageurs'], ['host', 'Propriétaires'], ['activity', 'Activité']];
+const TABS = [['villas', 'Annonces'], ['commissions', 'Commissions'], ['client', 'Voyageurs'], ['host', 'Propriétaires'], ['activity', 'Activité']];
 const ROLE_DOT = { client: 'bg-sky-500', host: 'bg-amber-500', admin: 'bg-neutral-800' };
 const field = 'rounded-full border border-neutral-300 px-4 py-2.5 text-sm outline-none focus:border-black';
 
@@ -121,7 +121,7 @@ function PendingVillas() {
     );
 }
 
-/* ---------- Onglets 2 et 3 : comptes voyageurs / propriétaires ---------- */
+/* ---------- Onglets : comptes voyageurs / propriétaires ---------- */
 function UsersTab({ role, onActivity }) {
     const [users, setUsers] = useState([]);
     const [q, setQ] = useState('');
@@ -235,48 +235,6 @@ function Stat({ label, value }) {
     );
 }
 
-/* ---------- Réservations : suivi en lecture seule ---------- */
-const BOOKING_FILTERS = [
-    ['', 'Toutes'], ['pending_host', 'En attente du propriétaire'], ['validated', 'Validées'],
-    ['in_progress', 'En cours'], ['closed', 'Clôturées'], ['cancelled', 'Annulées'],
-];
-
-function BookingsOverview() {
-    const [items, setItems] = useState([]);
-    const [filter, setFilter] = useState('');
-    useEffect(() => { api('/bookings').then((r) => setItems(r.data)); }, []);
-
-    const shown = filter ? items.filter((b) => b.status === filter) : items;
-
-    return (
-        <div>
-            <p className="mb-4 text-sm text-neutral-500">
-                Suivi en lecture seule : chaque propriétaire approuve, démarre et clôture les séjours de ses villas.
-            </p>
-            <select className={`${field} mb-5 w-full sm:w-auto`} value={filter} onChange={(e) => setFilter(e.target.value)}>
-                {BOOKING_FILTERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-
-            <div className="space-y-3">
-                {shown.length === 0 && <p className="text-neutral-500">Aucune réservation.</p>}
-                {shown.map((b) => {
-                    const [label, cls] = STATUS[b.status];
-                    return (
-                        <div key={b.id} className="flex flex-wrap items-center gap-4 rounded-2xl border border-neutral-200 p-4 text-sm">
-                            <div className="min-w-52 flex-1">
-                                <p className="font-semibold">#{b.id} · {b.villa.title}</p>
-                                <p className="text-neutral-500">{b.check_in} → {b.check_out} · client : {b.client.name}</p>
-                                <p>Total {eur(b.total_price)}</p>
-                            </div>
-                            <span className={`rounded-full px-3 py-1 text-xs font-medium ${cls}`}>{label}</span>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}
-
 /* ---------- Commissions de la plateforme (15 %) ---------- */
 function CommissionsTab() {
     const [data, setData] = useState(null);
@@ -313,7 +271,7 @@ export default function Admin() {
         <div className="mx-auto max-w-5xl px-5 py-12">
             <h1 className="mb-6 text-4xl tracking-tight">Espace concierge</h1>
 
-            <div className="mb-8 grid grid-cols-3 gap-1 rounded-3xl bg-neutral-100 p-1 text-xs font-medium sm:grid-cols-6 sm:rounded-full md:text-sm">
+            <div className="mb-8 grid grid-cols-3 gap-1 rounded-3xl bg-neutral-100 p-1 text-xs font-medium sm:grid-cols-5 sm:rounded-full md:text-sm">
                 {TABS.map(([key, label]) => (
                     <button
                         key={key}
@@ -328,7 +286,6 @@ export default function Admin() {
             {tab === 'villas' && <PendingVillas />}
             {(tab === 'client' || tab === 'host') && <UsersTab key={tab} role={tab} onActivity={openActivity} />}
             {tab === 'activity' && <ActivityTab user={activityUser} onClear={() => setActivityUser(null)} />}
-            {tab === 'bookings' && <BookingsOverview />}
             {tab === 'commissions' && <CommissionsTab />}
         </div>
     );

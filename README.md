@@ -31,23 +31,23 @@ Comptes de démo (mot de passe `password`) : `client@luxe.test`, `host@luxe.test
 
 | Méthode | Route | Rôle |
 |---|---|---|
-| POST | `/register`, `/login` | public |
+| POST | `/register` (10/min), `/login` (5/min par e-mail+IP, 20/min par IP) | public |
 | GET | `/stats`, `/properties?city=&price_min=&price_max=&guests=&has_pool=true&featured=true&available_from=&available_to=` | public |
-| GET | `/properties/{id}`, `/services`, `/seasons` | public |
+| GET | `/properties/{id}`, `/properties/{id}/reviews`, `/services`, `/yachts` | public |
 | POST | `/bookings/quote`, `/bookings` | connecté |
 | GET | `/bookings`, `/notifications`, `/me` | connecté |
 | PATCH | `/bookings/{id}/status` `{action: validate\|start\|close\|cancel}` | hôte / admin (annulation : client aussi) |
 | POST | `/bookings/{id}/pay` `{type: deposit\|balance}` | client (paiement simulé) |
-| GET/POST | `/host/properties`, PUT `/host/properties/{id}/seasons` | hôte |
+| GET/POST/PUT/DELETE | `/host/properties`, GET `/host/payouts` | hôte |
 | GET/PATCH | `/admin/properties`, `/admin/properties/{id}/moderate` | admin |
 
 ## Correspondance UML (pour la soutenance)
 
 - **Cas d'utilisation** : Voyageur / Propriétaire / Concierge-Admin (rôles + `EnsureRole`).
 - **Séquence** : `POST /bookings` → `BookingService::create` (transaction + `lockForUpdate` + contrôle de chevauchement) → `BookingSubmitted` → `HandleBookingSubmitted` → statut `pending_host` + notifications base de données (hôte + admins).
-- **Classes** : `User`, `Villa`, `Season` (many-to-many avec attribut `price_per_night` via `villa_season`), `Service`, `Booking` (pivot `booking_service` avec quantité/prix), `Image` (relation **polymorphique** : Villa, Service, User).
+- **Classes** : `User`, `Villa`, `Review`, `Service`, `Booking` (pivot `booking_service` avec quantité/prix), `Image` (relation **polymorphique** : Villa, Service, User).
 - **États-transitions** : `App\Enums\BookingStatus` — submitted → pending_host → validated → deposit_paid → balance_paid → in_progress → closed (cancelled possible avant le séjour).
-- **Activités** : `PricingService::quote` (prix par nuit selon saison + services, acompte 30 %).
+- **Activités** : `PricingService::quote` (prix par nuit × nombre de nuits + services, acompte 30 %).
 
 ## Pistes d'évolution (à citer en perspectives)
 Spatie MediaLibrary pour l'upload d'images, WebSockets (Reverb) pour le temps réel, vrai provider de paiement (Stripe), avis polymorphiques.

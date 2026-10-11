@@ -45,7 +45,7 @@ class BookingController extends Controller
     {
         abort_if($request->user()->role === 'admin', 403, 'Le concierge ne réserve pas : connectez-vous avec un compte voyageur.');
         $data = $request->validate($this->rules());
-        $villa = Villa::approved()->with('seasons')->findOrFail($data['villa_id']);
+        $villa = Villa::approved()->findOrFail($data['villa_id']);
 
         return $pricing->quote($villa, Carbon::parse($data['check_in']), Carbon::parse($data['check_out']), $data['services'] ?? []);
     }
@@ -59,7 +59,7 @@ class BookingController extends Controller
             ->response()->setStatusCode(201);
     }
 
-        public function status(Request $request, Booking $booking)
+    public function status(Request $request, Booking $booking)
     {
         $action = $request->validate([
             'action' => 'required|in:validate,start,close,cancel,confirm_onsite,refund',

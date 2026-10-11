@@ -4,22 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\VillaResource;
 use App\Models\ActivityLog;
+use App\Models\User;
 use App\Models\Villa;
+use App\Notifications\InfoNotification;
 use App\Services\VillaService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use App\Models\User;
-use App\Notifications\InfoNotification;
 
 class HostController extends Controller
 {
     public function index(Request $request)
     {
-        return VillaResource::collection($request->user()->villas()->with(['images', 'seasons'])->latest()->get());
+        return VillaResource::collection($request->user()->villas()->with('images')->latest()->get());
     }
 
     /** Validation commune à la création et à la modification. Retourne [attributs, images|null]. */
-        private function validated(Request $request): array
+    private function validated(Request $request): array
     {
         $yacht = Rule::requiredIf(fn () => $request->boolean('has_yacht'));
 
@@ -103,7 +103,7 @@ class HostController extends Controller
             }
         }
 
-        return new VillaResource($villa->load(['images', 'seasons']));
+        return new VillaResource($villa->load('images'));
     }
 
     /** DELETE /host/properties/{villa} : le créateur confirme, sans motif à fournir */
@@ -114,21 +114,5 @@ class HostController extends Controller
         $villas->delete($villa, $request->user());
 
         return response()->noContent();
-    }
-
-    /** Tarifs saisonniers : PUT /host/properties/{villa}/seasons  [{season_id, price_per_night}] */
-    public function syncSeasons(Request $request, Villa $villa)
-    {
-        abort_unless($villa->owner_id === $request->user()->id, 403);
-        $rows = $request->validate([
-            'seasons' => 'required|array',
-            'seasons.*.season_id' => 'required|exists:seasons,id',
-            'seasons.*.price_per_night' => 'required|numeric|min:1',
-        ])['seasons'];
-
-        $villa->seasons()->sync(collect($rows)->mapWithKeys(fn ($r) => [$r['season_id'] => ['price_per_night' => $r['price_per_night']]]));
-
-        $villa->update(['status' => 'pending']);
-        return new VillaResource($villa->load(['images', 'seasons']));
     }
 }

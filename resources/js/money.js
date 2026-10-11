@@ -3,7 +3,7 @@
  * Les montants venant de l'API sont TOUJOURS en Ariary (Ar), en entiers.
  * Le taux 1 $ = 5 000 Ar vient de config/money.php (injecté par app.blade.php dans window.__MONEY__).
  */
-const RATE = window.__MONEY__?.usd_rate ?? 25000;
+const RATE = window.__MONEY__?.usd_rate ?? 5000;
 let currency = 'MGA'; // 'MGA' (Ar, par défaut) ou 'USD' ($), selon le compte connecté
 
 export const USD_RATE = RATE;

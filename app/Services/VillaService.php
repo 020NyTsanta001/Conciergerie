@@ -16,11 +16,9 @@ class VillaService
     public function delete(Villa $villa, User $by, ?string $reason = null): void
     {
         $paid = $villa->bookings()->whereIn('status', ['deposit_paid', 'balance_paid', 'in_progress'])->exists();
-        $owed = \App\Models\Payout::where('status', 'pending')
-            ->whereHas('booking', fn ($q) => $q->where('villa_id', $villa->id))->exists();
-        if ($paid || $owed) {
+        if ($paid) {
             throw ValidationException::withMessages([
-                'villa' => 'Suppression impossible : des séjours payés, en cours ou des virements en attente sont liés à cette villa.',
+                'villa' => 'Suppression impossible : des séjours payés ou en cours sont liés à cette villa.',
             ]);
         }
 

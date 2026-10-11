@@ -18,14 +18,13 @@ use App\Http\Controllers\WalletController;
 use App\Http\Controllers\ReviewController;
 
 Route::prefix('v1')->group(function () {
-    Route::post('register', [AuthController::class, 'register']);
+    Route::post('register', [AuthController::class, 'register'])->middleware('throttle:10,1');
     Route::post('contact', [ContactController::class, 'store'])->middleware('throttle:5,1');
-    Route::post('login', [AuthController::class, 'login']);
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login');
     Route::get('stats', StatsController::class);
     Route::get('properties', [VillaController::class, 'index']);
     Route::get('properties/{villa}', [VillaController::class, 'show']);
     Route::get('properties/{villa}/reviews', [ReviewController::class, 'index']);
-    Route::get('seasons', [VillaController::class, 'seasons']);
     Route::get('yachts', [VillaController::class, 'yachts']);
     Route::get('services', [ServiceController::class, 'index']);
 
@@ -54,10 +53,7 @@ Route::prefix('v1')->group(function () {
             Route::post('properties', [HostController::class, 'store']);
             Route::put('properties/{villa}', [HostController::class, 'update']);
             Route::delete('properties/{villa}', [HostController::class, 'destroy']);
-            Route::put('properties/{villa}/seasons', [HostController::class, 'syncSeasons']);
             Route::get('payouts', [PayoutController::class, 'hostIndex']);
-            
-            
         });
 
         Route::middleware(EnsureRole::class.':admin')->prefix('admin')->group(function () {
@@ -68,8 +64,6 @@ Route::prefix('v1')->group(function () {
             Route::get('activity', [AdminActivityController::class, 'index']);
             Route::delete('properties/{villa}', [AdminController::class, 'destroy']);
             Route::get('payouts', [PayoutController::class, 'adminIndex']);
-            Route::patch('payouts/{payout}/paid', [PayoutController::class, 'markPaid']);
-            Route::patch('payouts/{payout}/paid', [PayoutController::class, 'markPaid']);
         });
     });
 });

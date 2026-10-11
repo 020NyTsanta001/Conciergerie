@@ -18,8 +18,6 @@ class Villa extends Model
 
     public function images() { return $this->morphMany(Image::class, 'imageable')->orderBy('position'); }
 
-    public function seasons() { return $this->belongsToMany(Season::class, 'villa_season')->withPivot('price_per_night'); }
-
     public function bookings() { return $this->hasMany(Booking::class); }
 
     public function scopeApproved(Builder $q): Builder { return $q->where('status', 'approved'); }
@@ -41,7 +39,5 @@ class Villa extends Model
                     ->where('check_out', '>', $f['available_from']));
             });
     }
-    public function Review() {
-        return $this->hasMany(Review::class);
-    }
+    public function reviews() { return $this->hasMany(Review::class); }
 }
