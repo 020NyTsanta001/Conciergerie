@@ -6,10 +6,10 @@ import { useAuth } from '../auth';
 // ⚠️ À renseigner : adresse du GitHub de l'entreprise (stage). Vide = bouton grisé, sans bonus.
 const LINKS = {
     github: 'https://github.com/020NyTsanta001',
-    orgGithub: 'https://github.com/020NyTsanta001', // '
+    orgGithub: 'https://github.com/MIT452', // '
     cv: '/cv.pdf',  // fichier à placer dans public/cv.pdf
 };
-const PHOTO = '/images/profile.jpg';
+const PHOTO = '/images/profile.webp';
 
 const field = 'w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-black';
 
