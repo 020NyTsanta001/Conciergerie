@@ -11,7 +11,7 @@ class Villa extends Model
 
     protected function casts(): array
     {
-        return ['has_pool' => 'boolean', 'has_yacht' => 'boolean', 'is_featured' => 'boolean', 'price_per_night' => 'float', 'yacht_places' => 'array'];
+        return ['owner_id' => 'integer','has_pool' => 'boolean', 'has_yacht' => 'boolean', 'is_featured' => 'boolean', 'price_per_night' => 'float', 'yacht_places' => 'array'];
     }
 
     public function owner() { return $this->belongsTo(User::class, 'owner_id'); }

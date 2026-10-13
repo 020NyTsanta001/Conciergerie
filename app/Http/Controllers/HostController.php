@@ -73,7 +73,7 @@ class HostController extends Controller
     /** PUT /host/properties/{villa} : réservé au créateur. Toute modification renvoie la villa en modération. */
     public function update(Request $request, Villa $villa)
     {
-        abort_unless($villa->owner_id === $request->user()->id, 403, 'Seul le créateur de la villa peut la modifier.');
+        abort_unless($villa->owner_id === (int) $request->user()->id, 403, 'Seul le créateur de la villa peut la modifier.');
 
         [$attributes, $images] = $this->validated($request);
 
@@ -109,7 +109,7 @@ class HostController extends Controller
     /** DELETE /host/properties/{villa} : le créateur confirme, sans motif à fournir */
     public function destroy(Request $request, Villa $villa, VillaService $villas)
     {
-        abort_unless($villa->owner_id === $request->user()->id, 403, 'Seul le créateur de la villa peut la supprimer ici.');
+        abort_unless($villa->owner_id === (int) $request->user()->id, 403, 'Seul le créateur de la villa peut la supprimer ici.');
 
         $villas->delete($villa, $request->user());
 
