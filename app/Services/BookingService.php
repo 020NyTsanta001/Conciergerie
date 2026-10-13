@@ -84,8 +84,8 @@ class BookingService
             return false;
         }
         // L'admin ne gère aucune réservation : il les consulte seulement.
-        $isOwner = $b->villa->owner_id === $u->id;
-        $isClient = $b->user_id === $u->id;
+        $isOwner = (int) $b->villa->owner_id === (int) $u->id;
+        $isClient = (int) $b->user_id === (int) $u->id;
         $beforeAnyPayment = in_array($b->status, [S::Submitted, S::PendingHost, S::Validated], true);
 
         return match ($to) {
@@ -101,7 +101,7 @@ class BookingService
     public function canRefund(User $u, Booking $b): bool
     {
         return $b->status === S::DepositPaid
-            && $b->villa->owner_id === $u->id
+            && (int) $b->villa->owner_id === (int) $u->id
             && Carbon::today()->lt($b->check_in);   // la date du séjour atteinte = plus de remboursement
     }
 
@@ -116,7 +116,7 @@ class BookingService
         if ($this->canRefund($u, $b)) {
             $actions[] = 'refund';
         }
-        if ($b->user_id === $u->id) {
+        if ((int) $b->user_id === (int) $u->id) {
             if ($b->status === S::Validated) $actions[] = 'pay_deposit';
             if ($b->status === S::DepositPaid) $actions[] = 'pay_balance';
         }
@@ -161,7 +161,7 @@ class BookingService
     {
         $b->loadMissing('villa.owner', 'user');
 
-        abort_unless($b->villa->owner_id === $u->id, 403, "Seul le propriétaire de la villa peut rembourser l'acompte.");
+        abort_unless((int) $b->villa->owner_id === (int) $u->id, 403, "Seul le propriétaire de la villa peut rembourser l'acompte.");
 
         if ($b->status !== S::DepositPaid) {
             throw ValidationException::withMessages(['refund' => "Aucun acompte remboursable : le remboursement ne couvre que l'acompte, tant que le solde n'est pas payé."]);
@@ -200,7 +200,7 @@ class BookingService
      */
     public function pay(User $u, Booking $b, string $type, string $method = 'wallet'): array
     {
-        abort_unless($b->user_id === $u->id, 403, 'Réservation non associée à votre compte.');
+        abort_unless((int) $b->user_id === (int) $u->id, 403, 'Réservation non associée à votre compte.');
         $b->loadMissing('villa.owner');
 
         if ($type === 'deposit') {
