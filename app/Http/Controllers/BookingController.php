@@ -27,6 +27,15 @@ class BookingController extends Controller
         ];
     }
 
+    /** Seul un compte voyageur réserve : l'admin ET le propriétaire doivent se connecter avec un compte voyageur. */
+    private function ensureTraveler(Request $request): void
+    {
+        $role = $request->user()->role;
+
+        abort_if($role === 'admin', 403, 'Le concierge ne réserve pas : connectez-vous avec un compte voyageur.');
+        abort_if($role === 'host', 403, 'Un propriétaire ne réserve pas : connectez-vous avec un compte voyageur.');
+    }
+
     public function index(Request $request)
     {
         $u = $request->user();
@@ -43,7 +52,7 @@ class BookingController extends Controller
 
     public function quote(Request $request, PricingService $pricing)
     {
-        abort_if($request->user()->role === 'admin', 403, 'Le concierge ne réserve pas : connectez-vous avec un compte voyageur.');
+        $this->ensureTraveler($request);
         $data = $request->validate($this->rules());
         $villa = Villa::approved()->findOrFail($data['villa_id']);
 
@@ -52,7 +61,7 @@ class BookingController extends Controller
 
     public function store(Request $request)
     {
-        abort_if($request->user()->role === 'admin', 403, 'Le concierge ne réserve pas : connectez-vous avec un compte voyageur.');
+        $this->ensureTraveler($request);
         $data = $request->validate($this->rules());
 
         return (new BookingResource($this->bookings->create($request->user(), $data)))
@@ -61,12 +70,20 @@ class BookingController extends Controller
 
     public function status(Request $request, Booking $booking)
     {
-        $action = $request->validate([
-            'action' => 'required|in:validate,start,close,cancel,confirm_onsite,refund',
-        ])['action'];
+        $data = $request->validate([
+            'action' => 'required|in:validate,start,close,cancel,confirm_onsite,refund,request_refund,decline_refund',
+            // la cause est obligatoire pour demander un remboursement (voyageur) et pour le refuser (hôte)
+            'reason' => 'required_if:action,request_refund,decline_refund|nullable|string|min:5|max:500',
+        ], [
+            'reason.required_if' => 'Écrivez la cause avant de continuer.',
+            'reason.min' => 'La cause est trop courte (5 caractères minimum).',
+        ]);
         $booking->load('villa');
 
-        return new BookingResource($this->bookings->transition($request->user(), $booking, $action)->load(['villa.images', 'user', 'services']));
+        return new BookingResource(
+            $this->bookings->transition($request->user(), $booking, $data['action'], $data['reason'] ?? null)
+                ->load(['villa.images', 'user', 'services'])
+        );
     }
 
     public function pay(Request $request, Booking $booking)
@@ -88,6 +105,6 @@ class BookingController extends Controller
     public function notifications(Request $request)
     {
         return $request->user()->notifications()->latest()->limit(30)->get()
-            ->map(fn ($n) => ['id' => $n->id, 'message' => $n->data['message'] ?? '', 'booking_id' => $n->data['booking_id'] ?? null, 'read' => (bool) $n->read_at, 'created_at' => $n->created_at]);
+            ->map(fn ($n) => ['id' => $n->id, 'message' => $n->data['message'] ?? '', 'booking_id' => $n->data['booking_id'] ?? null, 'area' => $n->data['area'] ?? null, 'read' => (bool) $n->read_at, 'created_at' => $n->created_at]);
     }
 }

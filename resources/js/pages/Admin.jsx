@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api, eur } from '../api';
+import { useDots } from '../dots';
+import { WithDot } from '../components/Dot';
 
-const TABS = [['villas', 'Annonces'], ['commissions', 'Commissions'], ['client', 'Voyageurs'], ['host', 'Propriétaires'], ['activity', 'Activité']];
+const TABS = [['villas', 'Annonces'], ['commissions', 'Commissions'], ['messages', 'Messages'], ['client', 'Voyageurs'], ['host', 'Propriétaires'], ['activity', 'Activité']];
+// onglet -> zone du point rouge
+const TAB_AREA = { villas: 'moderation', commissions: 'commissions', messages: 'messages' };
 const ROLE_DOT = { client: 'bg-sky-500', host: 'bg-amber-500', admin: 'bg-neutral-800' };
 const field = 'rounded-full border border-neutral-300 px-4 py-2.5 text-sm outline-none focus:border-black';
 
@@ -260,10 +264,59 @@ function CommissionsTab() {
     );
 }
 
+/* ---------- Messages du formulaire de contact ---------- */
+function MessagesTab() {
+    const [items, setItems] = useState(null);
+
+    useEffect(() => { api('/admin/messages').then(setItems).catch(() => setItems([])); }, []);
+
+    const markRead = async (m) => {
+        try {
+            await api(`/admin/messages/${m.id}/read`, { method: 'PATCH' });
+            setItems((list) => list.map((x) => (x.id === m.id ? { ...x, read: true } : x)));
+        } catch { /* le message reste « nouveau » */ }
+    };
+
+    if (!items) return null;
+
+    return (
+        <div className="space-y-3">
+            {items.length === 0 && <p className="text-neutral-500">Aucun message pour le moment.</p>}
+            {items.map((m) => (
+                <div key={m.id} className={`rounded-2xl border p-4 text-sm ${m.read ? 'border-neutral-200' : 'border-red-200 bg-red-50/40'}`}>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold">{m.name}</p>
+                        {!m.read && <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-medium text-white">Nouveau</span>}
+                        <span className="ml-auto text-xs text-neutral-500">{fmtWhen(m.created_at)}</span>
+                    </div>
+                    <a href={`mailto:${m.email}`} className="break-words text-neutral-500 underline">{m.email}</a>
+                    {m.subject && <p className="mt-2 font-medium">{m.subject}</p>}
+                    <p className="mt-1 whitespace-pre-wrap text-neutral-700">{m.message}</p>
+                    {!m.read && (
+                        <button onClick={() => markRead(m)} className="mt-3 rounded-full border border-neutral-300 px-4 py-2 text-xs font-semibold">Marquer comme lu</button>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+}
+
 /* ---------- Page ---------- */
 export default function Admin() {
+    const { dots, clear } = useDots();
     const [tab, setTab] = useState('villas');
+    const [nonce, setNonce] = useState(0); // un clic sur un onglet recharge sa liste (les nouveautés apparaissent)
     const [activityUser, setActivityUser] = useState(null);
+
+    // l'onglet « Annonces » est ouvert d'office : son point rouge disparaît dès l'arrivée sur la page
+    useEffect(() => { clear('moderation'); }, []); // eslint-disable-line
+
+    const openTab = (key) => {
+        if (key !== 'activity') setActivityUser(null);
+        setTab(key);
+        setNonce((n) => n + 1);
+        if (TAB_AREA[key]) clear(TAB_AREA[key]);
+    };
 
     const openActivity = (u) => { setActivityUser(u); setTab('activity'); };
 
@@ -271,22 +324,23 @@ export default function Admin() {
         <div className="mx-auto max-w-5xl px-5 py-12">
             <h1 className="mb-6 text-4xl tracking-tight">Espace concierge</h1>
 
-            <div className="mb-8 grid grid-cols-3 gap-1 rounded-3xl bg-neutral-100 p-1 text-xs font-medium sm:grid-cols-5 sm:rounded-full md:text-sm">
+            <div className="mb-8 grid grid-cols-3 gap-1 rounded-3xl bg-neutral-100 p-1 text-xs font-medium sm:grid-cols-6 sm:rounded-full md:text-sm">
                 {TABS.map(([key, label]) => (
                     <button
                         key={key}
-                        onClick={() => { if (key !== 'activity') setActivityUser(null); setTab(key); }}
+                        onClick={() => openTab(key)}
                         className={`rounded-full px-2 py-2.5 text-center transition-colors ${tab === key ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'}`}
                     >
-                        {label}
+                        <WithDot show={(dots[TAB_AREA[key]] ?? 0) > 0}>{label}</WithDot>
                     </button>
                 ))}
             </div>
 
-            {tab === 'villas' && <PendingVillas />}
+            {tab === 'villas' && <PendingVillas key={nonce} />}
             {(tab === 'client' || tab === 'host') && <UsersTab key={tab} role={tab} onActivity={openActivity} />}
             {tab === 'activity' && <ActivityTab user={activityUser} onClear={() => setActivityUser(null)} />}
-            {tab === 'commissions' && <CommissionsTab />}
+            {tab === 'commissions' && <CommissionsTab key={nonce} />}
+            {tab === 'messages' && <MessagesTab key={nonce} />}
         </div>
     );
 }

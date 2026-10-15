@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, eur } from '../api';
 import { toAr, fromAr, currencyLabel } from '../money';
+import { useDots } from '../dots';
 
 const field = 'rounded-xl border border-neutral-300 px-3 py-2.5 text-sm w-full outline-none focus:border-black';
 const empty = {
@@ -11,6 +12,7 @@ const empty = {
 const BADGE = { pending: 'bg-amber-100 text-amber-800', approved: 'bg-emerald-100 text-emerald-800', rejected: 'bg-rose-100 text-rose-800' };
 
 export default function Host() {
+    const { clear } = useDots();
     const [villas, setVillas] = useState([]);
     const [notifs, setNotifs] = useState([]);
     const [f, setF] = useState(empty);
@@ -21,7 +23,8 @@ export default function Host() {
 
     const load = () => {
         api('/host/properties').then((r) => setVillas(r.data));
-        api('/notifications').then(setNotifs).catch(() => {});
+        // le point rouge « Mes villas » disparaît quand le propriétaire ouvre la page ; les nouvelles notifications restent en gras
+        api('/notifications').then((n) => { setNotifs(n.filter((x) => x.area !== 'bookings')); clear('villas'); }).catch(() => {});
     };
     useEffect(() => { load(); }, []);
 
@@ -89,7 +92,7 @@ export default function Host() {
             {notifs.length > 0 && (
                 <div className="lg:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm space-y-1">
                     <p className="font-semibold">Notifications</p>
-                    {notifs.slice(0, 5).map((n) => <p key={n.id}>• {n.message}</p>)}
+                    {notifs.slice(0, 5).map((n) => <p key={n.id} className={n.read ? '' : 'font-semibold'}>• {n.message}</p>)}
                 </div>
             )}
             {msg && <p className="lg:col-span-2 rounded-2xl bg-neutral-100 px-5 py-3 text-sm">{msg}</p>}

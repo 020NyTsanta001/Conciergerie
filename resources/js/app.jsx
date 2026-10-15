@@ -3,6 +3,7 @@ import '@fontsource-variable/manrope';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth';
+import { DotsProvider } from './dots';
 import ErrorBoundary from './components/ErrorBoundary';
 import Preloader from './components/Preloader';
 import Layout from './components/Layout';
@@ -43,6 +44,7 @@ root.render(
     <ErrorBoundary>
         <BrowserRouter>
             <AuthProvider>
+                <DotsProvider>
                 <Preloader />
                 <MoneyBoundary>
                     <Routes>
@@ -60,6 +62,7 @@ root.render(
                 </Routes>
                 </MoneyBoundary>
                 
+                </DotsProvider>
             </AuthProvider>
         </BrowserRouter>
     </ErrorBoundary>

@@ -35,6 +35,9 @@ class BookingService
             $in = Carbon::parse($data['check_in']);
             $out = Carbon::parse($data['check_out']);
 
+            // garde-fou : on ne réserve jamais sa propre villa (le contrôleur bloque déjà les comptes hôte et admin)
+            abort_if((int) $villa->owner_id === (int) $user->id, 403, 'Vous ne pouvez pas réserver votre propre villa.');
+
             if ((int) $data['guests'] > $villa->capacity) {
                 throw ValidationException::withMessages(['guests' => "Capacité maximale : {$villa->capacity} voyageurs."]);
             }
@@ -91,18 +94,42 @@ class BookingService
         return match ($to) {
             S::Validated, S::InProgress, S::Closed => $isOwner,
             S::BalancePaid => $isOwner && $b->balance_method === 'on_site', // validation du paiement reçu sur place
-            // annulation simple : seulement tant qu'aucun argent n'est versé (après l'acompte : remboursement par l'hôte)
+            // annulation simple : seulement tant qu'aucun argent n'est versé (après l'acompte : demande de remboursement)
             S::Cancelled => $beforeAnyPayment && ($isOwner || $isClient),
             default => false,
         };
     }
 
-    /** Remboursement de l'acompte : réservé à l'hôte, avant la date de séjour, tant que le solde n'est pas payé. */
+    /** Le séjour n'a pas encore commencé : le remboursement de l'acompte reste possible. */
+    private function beforeStay(Booking $b): bool
+    {
+        return Carbon::today()->lt($b->check_in);
+    }
+
+    /** Le voyageur demande le remboursement de son acompte (une seule demande par réservation). */
+    public function canRequestRefund(User $u, Booking $b): bool
+    {
+        return $b->status === S::DepositPaid
+            && (int) $b->user_id === (int) $u->id
+            && $b->refund_status === null
+            && $this->beforeStay($b);
+    }
+
+    /** L'hôte accepte une demande en attente (avant la date du séjour, tant que le solde n'est pas payé). */
     public function canRefund(User $u, Booking $b): bool
     {
         return $b->status === S::DepositPaid
+            && $b->refund_status === 'requested'
             && (int) $b->villa->owner_id === (int) $u->id
-            && Carbon::today()->lt($b->check_in);   // la date du séjour atteinte = plus de remboursement
+            && $this->beforeStay($b);   // la date du séjour atteinte = plus de remboursement
+    }
+
+    /** L'hôte refuse une demande en attente (il doit écrire la cause). */
+    public function canDeclineRefund(User $u, Booking $b): bool
+    {
+        return $b->status === S::DepositPaid
+            && $b->refund_status === 'requested'
+            && (int) $b->villa->owner_id === (int) $u->id;
     }
 
     public function actionsFor(User $u, Booking $b): array
@@ -113,21 +140,34 @@ class BookingService
         ];
         $actions = array_keys(array_filter($map, fn ($to) => $this->can($u, $b, $to)));
 
+        if ($this->canRequestRefund($u, $b)) {
+            $actions[] = 'request_refund';
+        }
         if ($this->canRefund($u, $b)) {
             $actions[] = 'refund';
         }
+        if ($this->canDeclineRefund($u, $b)) {
+            $actions[] = 'decline_refund';
+        }
         if ((int) $b->user_id === (int) $u->id) {
             if ($b->status === S::Validated) $actions[] = 'pay_deposit';
-            if ($b->status === S::DepositPaid) $actions[] = 'pay_balance';
+            // tant qu'une demande de remboursement est en attente, le solde ne peut pas être payé
+            if ($b->status === S::DepositPaid && $b->refund_status !== 'requested') $actions[] = 'pay_balance';
         }
 
         return $actions;
     }
 
-    public function transition(User $u, Booking $b, string $action): Booking
+    public function transition(User $u, Booking $b, string $action, ?string $reason = null): Booking
     {
+        if ($action === 'request_refund') {
+            return $this->requestRefund($u, $b, $reason);
+        }
         if ($action === 'refund') {
             return $this->refundDeposit($u, $b);
+        }
+        if ($action === 'decline_refund') {
+            return $this->declineRefund($u, $b, $reason);
         }
 
         $to = [
@@ -146,17 +186,85 @@ class BookingService
         }
 
         $b->update(['status' => $to]);
-        if ($to === S::Closed) {
-            $b->loadMissing('user', 'villa');
+        $b->loadMissing('user', 'villa.owner');
+
+        if ($to === S::Validated) {
+            // point rouge « Réservations » chez le voyageur : sa demande est acceptée, il peut payer l'acompte
             $b->user->notify(new InfoNotification(
-                "Votre séjour à « {$b->villa->title} » est terminé : vous pouvez laisser un avis sur la page de la villa."
+                "Bonne nouvelle : votre réservation #{$b->id} (« {$b->villa->title} ») a été acceptée. Vous pouvez maintenant payer l'acompte de ".Money::format((int) $b->deposit_amount).'.',
+                'bookings', $b->id
+            ));
+        }
+
+        if ($to === S::Cancelled) {
+            // la partie qui n'a pas annulé est prévenue
+            $byOwner = (int) $b->villa->owner_id === (int) $u->id;
+            $target = $byOwner ? $b->user : $b->villa->owner;
+            $target->notify(new InfoNotification(
+                $byOwner
+                    ? "Votre réservation #{$b->id} (« {$b->villa->title} ») a été refusée ou annulée par le propriétaire."
+                    : "Le voyageur {$b->user->name} a annulé la réservation #{$b->id} (« {$b->villa->title} »).",
+                'bookings', $b->id
+            ));
+        }
+
+        if ($to === S::Closed) {
+            // invitation à laisser un avis : point rouge « Réservations » chez le voyageur
+            $b->user->notify(new InfoNotification(
+                "Votre séjour à « {$b->villa->title} » est terminé : vous pouvez laisser un avis sur la page de la villa.",
+                'bookings', $b->id
             ));
         }
 
         return $b;
     }
 
-    /** L'hôte rembourse l'acompte (jamais la totalité) avant la date de séjour : la réservation est annulée et les dates sont libérées. */
+    /* ------------------------------------------------------------------ */
+    /*  Remboursement de l'acompte : demande -> acceptation / refus        */
+    /* ------------------------------------------------------------------ */
+
+    /** Le voyageur demande le remboursement de l'acompte et doit écrire la cause. */
+    private function requestRefund(User $u, Booking $b, ?string $reason): Booking
+    {
+        $b->loadMissing('villa.owner', 'user');
+
+        abort_unless((int) $b->user_id === (int) $u->id, 403, 'Seul le voyageur de cette réservation peut demander un remboursement.');
+
+        if ($b->status !== S::DepositPaid) {
+            throw ValidationException::withMessages(['refund' => "Aucun acompte remboursable : le remboursement ne couvre que l'acompte, tant que le solde n'est pas payé."]);
+        }
+        if (! $this->beforeStay($b)) {
+            throw ValidationException::withMessages(['refund' => "Demande impossible : la date du séjour est atteinte. L'acompte reste acquis."]);
+        }
+        if ($b->refund_status !== null) {
+            throw ValidationException::withMessages(['refund' => 'Une demande de remboursement a déjà été envoyée pour cette réservation.']);
+        }
+
+        $reason = trim((string) $reason);
+        if ($reason === '') {
+            throw ValidationException::withMessages(['reason' => 'Écrivez la cause de votre demande.']);
+        }
+
+        $b->update([
+            'refund_status' => 'requested',
+            'refund_reason' => $reason,
+            'refund_decline_reason' => null,
+            'refund_requested_at' => now(),
+        ]);
+
+        // point rouge « Réservations » chez l'hôte
+        $b->villa->owner->notify(new InfoNotification(
+            "Le voyageur {$b->user->name} demande le remboursement de l'acompte de ".Money::format((int) $b->deposit_amount)
+            ." (réservation #{$b->id}, « {$b->villa->title} »). Cause : {$reason}",
+            'bookings', $b->id
+        ));
+
+        ActivityLog::record($u, 'refund_requested', "a demandé le remboursement de l'acompte (réservation #{$b->id})");
+
+        return $b;
+    }
+
+    /** L'hôte accepte la demande, sans cause à fournir : l'acompte est rendu, la réservation est annulée et les dates sont libérées. */
     private function refundDeposit(User $u, Booking $b): Booking
     {
         $b->loadMissing('villa.owner', 'user');
@@ -166,7 +274,10 @@ class BookingService
         if ($b->status !== S::DepositPaid) {
             throw ValidationException::withMessages(['refund' => "Aucun acompte remboursable : le remboursement ne couvre que l'acompte, tant que le solde n'est pas payé."]);
         }
-        if (! Carbon::today()->lt($b->check_in)) {
+        if ($b->refund_status !== 'requested') {
+            throw ValidationException::withMessages(['refund' => 'Aucune demande de remboursement à accepter pour cette réservation.']);
+        }
+        if (! $this->beforeStay($b)) {
             throw ValidationException::withMessages(['refund' => "Remboursement impossible : la date du séjour est atteinte. L'acompte reste acquis et la villa reste indisponible pour ces dates."]);
         }
 
@@ -178,14 +289,47 @@ class BookingService
                 "Votre solde est insuffisant pour rembourser l'acompte (".Money::format($amount).').');
             $this->gateway->refund($b->user, $amount, "Remboursement acompte réservation #{$b->id}", $b->id);
 
-            $b->update(['status' => S::Cancelled, 'paid_amount' => max(0, $b->paid_amount - $amount)]);
+            $b->update([
+                'status' => S::Cancelled,
+                'paid_amount' => max(0, $b->paid_amount - $amount),
+                'refund_status' => 'accepted',
+            ]);
 
             $b->user->notify(new InfoNotification(
-                "Votre acompte de ".Money::format($amount)." pour la réservation #{$b->id} (« {$b->villa->title} ») a été remboursé par le propriétaire. La réservation est annulée."
+                "Votre demande de remboursement a été acceptée : l'acompte de ".Money::format($amount)." pour la réservation #{$b->id} (« {$b->villa->title} ») vous a été rendu. La réservation est annulée.",
+                'bookings', $b->id
             ));
         });
 
-        ActivityLog::record($u, 'booking_refund', "a remboursé l'acompte de ".Money::format($amount)." (réservation #{$b->id})");
+        ActivityLog::record($u, 'booking_refund', "a accepté le remboursement de l'acompte de ".Money::format($amount)." (réservation #{$b->id})");
+
+        return $b;
+    }
+
+    /** L'hôte refuse la demande : la cause qu'il écrit est envoyée au voyageur dans sa notification. */
+    private function declineRefund(User $u, Booking $b, ?string $reason): Booking
+    {
+        $b->loadMissing('villa', 'user');
+
+        abort_unless((int) $b->villa->owner_id === (int) $u->id, 403, 'Seul le propriétaire de la villa peut répondre à une demande de remboursement.');
+
+        if ($b->status !== S::DepositPaid || $b->refund_status !== 'requested') {
+            throw ValidationException::withMessages(['refund' => 'Aucune demande de remboursement en attente pour cette réservation.']);
+        }
+
+        $reason = trim((string) $reason);
+        if ($reason === '') {
+            throw ValidationException::withMessages(['reason' => 'Écrivez la cause du refus.']);
+        }
+
+        $b->update(['refund_status' => 'declined', 'refund_decline_reason' => $reason]);
+
+        $b->user->notify(new InfoNotification(
+            "Votre demande de remboursement pour la réservation #{$b->id} (« {$b->villa->title} ») a été refusée par le propriétaire. Cause : {$reason}",
+            'bookings', $b->id
+        ));
+
+        ActivityLog::record($u, 'refund_declined', "a refusé la demande de remboursement (réservation #{$b->id})");
 
         return $b;
     }
@@ -217,7 +361,8 @@ class BookingService
                 $this->wallet->credit($b->villa->owner, $amount, 'receipt', "Acompte réservation #{$b->id}", $b->id);
                 $b->update(['status' => S::DepositPaid, 'paid_amount' => $b->paid_amount + $amount]);
                 $b->villa->owner->notify(new InfoNotification(
-                    "Acompte reçu pour la réservation #{$b->id} (« {$b->villa->title} ») : ".Money::format($amount).'.'
+                    "Acompte reçu pour la réservation #{$b->id} (« {$b->villa->title} ») : ".Money::format($amount).'.',
+                    'bookings', $b->id
                 ));
 
                 return ['reference' => $payment->reference, 'amount' => $amount, 'booking' => $b];
@@ -225,13 +370,17 @@ class BookingService
         }
 
         $this->requireStatus($b, S::DepositPaid, 'solde');
+        if ($b->refund_status === 'requested') {
+            throw ValidationException::withMessages(['type' => 'Une demande de remboursement est en attente : attendez la réponse du propriétaire avant de payer le solde.']);
+        }
         $balance = (int) ($b->total_price - $b->deposit_amount);
 
         if ($method === 'on_site') {
             // paiement remis à l'hôte en main propre : rien n'est débité ; l'hôte valide à l'arrivée
             $b->update(['balance_method' => 'on_site']);
             $b->villa->owner->notify(new InfoNotification(
-                "Le voyageur paiera le solde de ".Money::format($balance)." sur place au début du séjour (réservation #{$b->id}). Validez la réception à son arrivée."
+                "Le voyageur paiera le solde de ".Money::format($balance)." sur place au début du séjour (réservation #{$b->id}). Validez la réception à son arrivée.",
+                'bookings', $b->id
             ));
 
             return ['reference' => 'ON-SITE', 'amount' => 0, 'booking' => $b];
@@ -280,7 +429,8 @@ class BookingService
 
         $host->notify(new InfoNotification(
             "Solde reçu pour la réservation #{$b->id} (« {$b->villa->title} ») : ".Money::format($hostBalance).
-            '. Total reçu avec l\'acompte : '.Money::format($hostShare)." ({$pct} %)."
+            '. Total reçu avec l\'acompte : '.Money::format($hostShare)." ({$pct} %).",
+            'bookings', $b->id
         ));
     }
 
@@ -300,7 +450,8 @@ class BookingService
             $this->recordPayout($b, $host, $gross, $commission, $hostShare);
 
             $host->notify(new InfoNotification(
-                "Paiement sur place validé pour la réservation #{$b->id} : commission de ".Money::format($commission).' prélevée sur votre solde.'
+                "Paiement sur place validé pour la réservation #{$b->id} : commission de ".Money::format($commission).' prélevée sur votre solde.',
+                'bookings', $b->id
             ));
         });
     }
@@ -317,8 +468,10 @@ class BookingService
             "Commission villa « {$b->villa->title} » par {$host->name}", $b->id);
 
         foreach ($admins as $admin) {
+            // point rouge « Modération > Commissions »
             $admin->notify(new InfoNotification(
-                "Commission de la villa « {$b->villa->title} » par {$host->name} : ".Money::format($commission)." (réservation #{$b->id})."
+                "Commission de la villa « {$b->villa->title} » par {$host->name} : ".Money::format($commission)." (réservation #{$b->id}).",
+                'commissions'
             ));
         }
     }

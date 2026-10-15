@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\ContactMessage;
+use App\Models\User;
+use App\Notifications\InfoNotification;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 
 class ContactController extends Controller
 {
@@ -16,8 +19,17 @@ class ContactController extends Controller
             'message'=>'required|string|min:10|max:2000',
         ]);
 
-        ContactMessage::create($data);
-    return response()->json(['message'=>'Merci, votre message a bien été envoyé'], 201);
+        $contact = ContactMessage::create($data);
+
+        // point rouge sur « Modération > Messages » chez les concierges
+        Notification::send(
+            User::where('role', 'admin')->get(),
+            new InfoNotification(
+                "Nouveau message de {$contact->name}".($contact->subject ? " : « {$contact->subject} »" : '').'.',
+                'messages'
+            )
+        );
+
+        return response()->json(['message'=>'Merci, votre message a bien été envoyé'], 201);
     }
-    
 }

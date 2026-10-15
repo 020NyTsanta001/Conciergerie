@@ -20,6 +20,12 @@ class BookingResource extends JsonResource
             'deposit_amount' => $this->deposit_amount,
             'paid_amount' => $this->paid_amount,
             'balance_method' => $this->balance_method,
+            'refund' => [
+                'status' => $this->refund_status,                       // null | requested | declined | accepted
+                'reason' => $this->refund_reason,                       // cause écrite par le voyageur
+                'decline_reason' => $this->refund_decline_reason,       // cause écrite par l'hôte s'il refuse
+                'requested_at' => $this->refund_requested_at?->toIso8601String(),
+            ],
             'review' => $this->whenLoaded('review', fn () => $this->review ? ['id' => $this->review->id, 'rating' => $this->review->rating] : null),
             'villa' => new VillaResource($this->whenLoaded('villa')),
             'client' => $this->whenLoaded('user', fn () => ['id' => $this->user->id, 'name' => $this->user->name]),

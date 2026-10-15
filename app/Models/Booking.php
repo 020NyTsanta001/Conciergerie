@@ -12,13 +12,13 @@ class Booking extends Model
     protected function casts(): array
     {
         return [
-            'user_id' => 'integer',
             'check_in' => 'date',
             'check_out' => 'date',
             'status' => BookingStatus::class,
             'total_price' => 'float',
             'deposit_amount' => 'float',
             'paid_amount' => 'float',
+            'refund_requested_at' => 'datetime',
         ];
     }
 

@@ -8,6 +8,11 @@ export default function VillaCard({ villa, className = '' }) {
                 <img src={villa.images[0]} alt={villa.title} loading="lazy" className="absolute inset-0 h-full w-full object-cover transition duration-700 group-hover:scale-105" />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/0 to-transparent" />
+            {villa.has_yacht && (
+                <span className="absolute left-4 top-4 max-w-[80%] truncate rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-neutral-900 backdrop-blur">
+                    Yacht{villa.yacht_name ? ` · ${villa.yacht_name}` : ''}
+                </span>
+            )}
             <div className="absolute bottom-0 p-5 text-white">
                 <p className="text-lg font-semibold">{villa.title}</p>
                 <p className="text-sm text-white/80">{villa.city}, {villa.country} · {eur(villa.price_per_night)} / nuit</p>

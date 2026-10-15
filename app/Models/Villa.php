@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class Villa extends Model
 {
@@ -11,7 +12,7 @@ class Villa extends Model
 
     protected function casts(): array
     {
-        return ['owner_id' => 'integer','has_pool' => 'boolean', 'has_yacht' => 'boolean', 'is_featured' => 'boolean', 'price_per_night' => 'float', 'yacht_places' => 'array'];
+        return ['has_pool' => 'boolean', 'has_yacht' => 'boolean', 'is_featured' => 'boolean', 'price_per_night' => 'float', 'yacht_places' => 'array'];
     }
 
     public function owner() { return $this->belongsTo(User::class, 'owner_id'); }
@@ -32,11 +33,18 @@ class Villa extends Model
             ->when($f['guests'] ?? null, fn ($q, $v) => $q->where('capacity', '>=', $v))
             ->when(filter_var($f['has_pool'] ?? false, FILTER_VALIDATE_BOOLEAN), fn ($q) => $q->where('has_pool', true))
             ->when(filter_var($f['featured'] ?? false, FILTER_VALIDATE_BOOLEAN), fn ($q) => $q->where('is_featured', true))
-            ->when(($f['available_from'] ?? null) && ($f['available_to'] ?? null), function ($q) use ($f) {
-                $q->whereDoesntHave('bookings', fn ($b) => $b
-                    ->where('status', '!=', 'cancelled')
-                    ->where('check_in', '<', $f['available_to'])
-                    ->where('check_out', '>', $f['available_from']));
+            ->when(filter_var($f['has_yacht'] ?? false, FILTER_VALIDATE_BOOLEAN), fn ($q) => $q->where('has_yacht', true))
+            // recherche libre : la villa OU son yacht (nom, description, lieux de sortie) correspond
+            ->when(trim((string) ($f['q'] ?? '')) !== '', function ($q) use ($f) {
+                $like = '%'.mb_strtolower(trim($f['q'])).'%';
+                $text = DB::connection()->getDriverName() === 'mysql' ? 'CHAR' : 'TEXT'; // yacht_places est une colonne JSON
+
+                $q->where(function ($w) use ($like, $text) {
+                    foreach (['title', 'city', 'country', 'description', 'yacht_name', 'yacht_description'] as $col) {
+                        $w->orWhereRaw("LOWER({$col}) LIKE ?", [$like]);
+                    }
+                    $w->orWhereRaw("LOWER(CAST(yacht_places AS {$text})) LIKE ?", [$like]);
+                });
             });
     }
     public function reviews() { return $this->hasMany(Review::class); }

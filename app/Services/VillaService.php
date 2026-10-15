@@ -33,11 +33,11 @@ class VillaService
         )->get();
 
         DB::transaction(function () use ($villa, $by, $reason, $title, $owner, $clients) {
-            if ($by->id !== $owner->id) { // supprimée par un admin : le propriétaire est prévenu avec la cause
-                $owner->notify(new InfoNotification("Votre villa « {$title} » a été supprimée par un concierge. Motif : {$reason}"));
+            if ((int) $by->id !== (int) $owner->id) { // supprimée par un admin : le propriétaire est prévenu avec la cause
+                $owner->notify(new InfoNotification("Votre villa « {$title} » a été supprimée par un concierge. Motif : {$reason}", 'villas'));
             }
             if ($clients->isNotEmpty()) {
-                Notification::send($clients, new InfoNotification("La villa « {$title} » a été supprimée : votre réservation est annulée."));
+                Notification::send($clients, new InfoNotification("La villa « {$title} » a été supprimée : votre réservation est annulée.", 'bookings'));
             }
 
             $villa->images()->delete();
@@ -46,7 +46,7 @@ class VillaService
             ActivityLog::record(
                 $by,
                 'villa_deleted',
-                "a supprimé la villa « {$title} »".($by->id !== $owner->id ? " de {$owner->name} (motif : {$reason})" : '')
+                "a supprimé la villa « {$title} »".((int) $by->id !== (int) $owner->id ? " de {$owner->name} (motif : {$reason})" : '')
             );
         });
     }

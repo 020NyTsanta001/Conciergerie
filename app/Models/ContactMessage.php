@@ -12,4 +12,9 @@ class ContactMessage extends Model
         'email',
         'message'
     ];
+
+    protected function casts(): array
+    {
+        return ['read_at' => 'datetime'];
+    }
 }

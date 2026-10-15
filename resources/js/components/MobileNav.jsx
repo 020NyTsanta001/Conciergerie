@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { WithDot } from './Dot';
+import { useDots, adminCount } from '../dots';
 
 export default function MobileNav({ user, transparent }) {
     const { pathname } = useLocation();
+    const { dots } = useDots();
+    const anyDot = (dots.bookings ?? 0) + (dots.villas ?? 0) + adminCount(dots) > 0;
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
 
@@ -38,13 +42,14 @@ export default function MobileNav({ user, transparent }) {
                     {open ? <path d="M3 3l10 10M13 3L3 13" /> : <path d="M2 4h12M2 8h12M2 12h12" />}
                 </svg>
             </button>
+            {anyDot && !open && <span className="pointer-events-none absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500" />}
 
             {open && (
                 <div role="menu" className="absolute right-0 mt-2 w-56 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl">
                     <NavLink to="/villas" className={item}>Propriétés</NavLink>
-                    {user && <NavLink to="/bookings" className={item}>Réservations</NavLink>}
-                    {user?.role === 'host' && <NavLink to="/host" className={item}>Mes villas</NavLink>}
-                    {user?.role === 'admin' && <NavLink to="/admin" className={item}>Modération</NavLink>}
+                    {user && <NavLink to="/bookings" className={item}><WithDot show={(dots.bookings ?? 0) > 0}>Réservations</WithDot></NavLink>}
+                    {user?.role === 'host' && <NavLink to="/host" className={item}><WithDot show={(dots.villas ?? 0) > 0}>Mes villas</WithDot></NavLink>}
+                    {user?.role === 'admin' && <NavLink to="/admin" className={item}><WithDot show={adminCount(dots) > 0}>Modération</WithDot></NavLink>}
                 </div>
             )}
         </div>

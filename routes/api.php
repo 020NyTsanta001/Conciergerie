@@ -16,6 +16,8 @@ use App\Http\Controllers\AdminUserController;
 use App\Http\Controllers\PayoutController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\AdminMessageController;
 
 Route::prefix('v1')->group(function () {
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:10,1');
@@ -47,6 +49,8 @@ Route::prefix('v1')->group(function () {
         Route::patch('bookings/{booking}/status', [BookingController::class, 'status']);
         Route::post('bookings/{booking}/pay', [BookingController::class, 'pay']);
         Route::get('notifications', [BookingController::class, 'notifications']);
+        Route::get('notifications/dots', [NotificationController::class, 'dots']);
+        Route::post('notifications/read', [NotificationController::class, 'read']);
 
         Route::middleware(EnsureRole::class.':host')->prefix('host')->group(function () {
             Route::get('properties', [HostController::class, 'index']);
@@ -64,6 +68,8 @@ Route::prefix('v1')->group(function () {
             Route::get('activity', [AdminActivityController::class, 'index']);
             Route::delete('properties/{villa}', [AdminController::class, 'destroy']);
             Route::get('payouts', [PayoutController::class, 'adminIndex']);
+            Route::get('messages', [AdminMessageController::class, 'index']);
+            Route::patch('messages/{message}/read', [AdminMessageController::class, 'read']);
         });
     });
 });

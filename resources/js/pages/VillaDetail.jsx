@@ -10,6 +10,8 @@ const field = 'rounded-xl border border-neutral-300 px-3 py-2.5 text-sm w-full o
 export default function VillaDetail() {
     const { id } = useParams();
     const { user, logout } = useAuth();
+    // l'admin et le propriétaire ne réservent pas : ils doivent d'abord se connecter avec un compte voyageur
+    const isStaff = user?.role === 'admin' || user?.role === 'host';
     const nav = useNavigate();
     const [villa, setVilla] = useState(null);
     const [services, setServices] = useState([]);
@@ -36,7 +38,7 @@ export default function VillaDetail() {
     useEffect(() => {
         setQuote(null);
         setError('');
-        if (!user || user.role === 'admin' || !form.check_in || !form.check_out || form.check_out <= form.check_in) return;
+        if (!user || isStaff || !form.check_in || !form.check_out || form.check_out <= form.check_in) return;
         api('/bookings/quote', { method: 'POST', body: payload() }).then(setQuote).catch((e) => setError(e.message));
     }, [form, picked, user]); // eslint-disable-line
 
@@ -96,7 +98,12 @@ export default function VillaDetail() {
                     </div>
                 )}
                 {error && <p className="text-sm text-rose-600">{error}</p>}
-                {user?.role === 'admin' ? (
+                {isStaff && (
+                    <p className="text-xs text-neutral-500">
+                        {user.role === 'admin' ? 'Le concierge' : 'Un propriétaire'} ne réserve pas : passez en mode voyageur pour réserver.
+                    </p>
+                )}
+                {isStaff ? (
                     <button
                         onClick={async () => { await logout(); nav('/login'); }}
                         className="w-full rounded-full border border-neutral-300 py-3.5 text-sm font-semibold hover:bg-neutral-50"

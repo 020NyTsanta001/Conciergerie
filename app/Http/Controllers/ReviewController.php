@@ -50,7 +50,7 @@ class ReviewController extends Controller
     /** POST /bookings/{booking}/review : le voyageur, une fois le séjour clôturé, une seule fois par séjour */
     public function store(Request $request, Booking $booking)
     {
-        abort_unless($booking->user_id === $request->user()->id, 403, "Seul le voyageur de ce séjour peut donner son avis.");
+        abort_unless((int) $booking->user_id === (int) $request->user()->id, 403, "Seul le voyageur de ce séjour peut donner son avis.");
 
         if ($booking->status !== BookingStatus::Closed) {
             throw ValidationException::withMessages(['review' => 'Vous pourrez donner votre avis une fois le séjour clôturé.']);
@@ -74,7 +74,7 @@ class ReviewController extends Controller
     /** PUT /reviews/{review} : l'auteur uniquement */
     public function update(Request $request, Review $review)
     {
-        abort_unless($review->user_id === $request->user()->id, 403, "Seul l'auteur peut modifier son avis.");
+        abort_unless((int) $review->user_id === (int) $request->user()->id, 403, "Seul l'auteur peut modifier son avis.");
 
         $review->update($request->validate($this->rules()));
 
@@ -85,7 +85,7 @@ class ReviewController extends Controller
     public function destroy(Request $request, Review $review)
     {
         $u = $request->user();
-        $isAuthor = $review->user_id === $u->id;
+        $isAuthor = (int) $review->user_id === (int) $u->id;
         abort_unless($isAuthor || $u->role === 'admin', 403, "Seuls l'auteur ou un concierge peuvent supprimer cet avis.");
 
         $review->load('villa:id,title', 'user');

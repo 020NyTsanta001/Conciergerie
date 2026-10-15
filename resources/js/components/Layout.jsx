@@ -3,9 +3,12 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth';
 import UserMenu from './UserMenu';
 import MobileNav from './MobileNav';
+import { WithDot } from './Dot';
+import { useDots, adminCount } from '../dots';
 
 export default function Layout() {
     const { user } = useAuth();
+    const { dots } = useDots();
     const { pathname } = useLocation();
     const isHome = pathname === '/';
     const [scrolled, setScrolled] = useState(false);
@@ -75,9 +78,9 @@ export default function Layout() {
                     {/* Navigation ordinateur (masquée sur mobile) */}
                     <nav className="hidden md:flex gap-8">
                         <NavLink to="/villas" className={link}>Propriétés</NavLink>
-                        {user && <NavLink to="/bookings" className={link}>Réservations</NavLink>}
-                        {user?.role === 'host' && <NavLink to="/host" className={link}>Mes villas</NavLink>}
-                        {user?.role === 'admin' && <NavLink to="/admin" className={link}>Modération</NavLink>}
+                        {user && <NavLink to="/bookings" className={link}><WithDot show={(dots.bookings ?? 0) > 0}>Réservations</WithDot></NavLink>}
+                        {user?.role === 'host' && <NavLink to="/host" className={link}><WithDot show={(dots.villas ?? 0) > 0}>Mes villas</WithDot></NavLink>}
+                        {user?.role === 'admin' && <NavLink to="/admin" className={link}><WithDot show={adminCount(dots) > 0}>Modération</WithDot></NavLink>}
                     </nav>
 
                     {/* Droite : sur mobile, cercle navigation + cercle compte, presque collés */}

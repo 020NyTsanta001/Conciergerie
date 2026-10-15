@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
+use App\Notifications\InfoNotification;
 use App\Services\VillaService;
 
 use App\Http\Resources\VillaResource;
@@ -19,6 +20,17 @@ class AdminController extends Controller
     public function moderate(Request $request, Villa $villa)
     {
         $villa->update($request->validate(['status' => 'required|in:approved,rejected']));
+
+        // point rouge « Mes villas » chez le propriétaire : villa acceptée ou refusée
+        if ($villa->wasChanged('status')) {
+            $villa->loadMissing('owner');
+            $villa->owner->notify(new InfoNotification(
+                $villa->status === 'approved'
+                    ? "Votre villa « {$villa->title} » a été acceptée : elle est maintenant visible sur le site."
+                    : "Votre villa « {$villa->title} » a été refusée par un concierge. Vous pouvez la modifier et la soumettre à nouveau.",
+                'villas'
+            ));
+        }
 
         return new VillaResource($villa->load(['images', 'owner']));
     }

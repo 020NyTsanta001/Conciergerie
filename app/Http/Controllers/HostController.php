@@ -67,13 +67,21 @@ class HostController extends Controller
             $villa->images()->create(['url' => $url, 'position' => $i]);
         }
 
+        // point rouge « Modération > Annonces » chez les concierges
+        foreach (User::where('role', 'admin')->get() as $admin) {
+            $admin->notify(new InfoNotification(
+                "Nouvelle villa « {$villa->title} » de {$request->user()->name} : elle attend votre approbation.",
+                'moderation'
+            ));
+        }
+
         return (new VillaResource($villa->load('images')))->response()->setStatusCode(201);
     }
 
     /** PUT /host/properties/{villa} : réservé au créateur. Toute modification renvoie la villa en modération. */
     public function update(Request $request, Villa $villa)
     {
-        abort_unless($villa->owner_id === (int) $request->user()->id, 403, 'Seul le créateur de la villa peut la modifier.');
+        abort_unless((int) $villa->owner_id === (int) $request->user()->id, 403, 'Seul le créateur de la villa peut la modifier.');
 
         [$attributes, $images] = $this->validated($request);
 
@@ -98,7 +106,8 @@ class HostController extends Controller
 
             foreach (User::where('role', 'admin')->get() as $admin) {
                 $admin->notify(new InfoNotification(
-                    "La villa « {$villa->title} » de {$request->user()->name} a été modifiée : elle attend une nouvelle approbation."
+                    "La villa « {$villa->title} » de {$request->user()->name} a été modifiée : elle attend une nouvelle approbation.",
+                    'moderation'
                 ));
             }
         }
@@ -109,7 +118,7 @@ class HostController extends Controller
     /** DELETE /host/properties/{villa} : le créateur confirme, sans motif à fournir */
     public function destroy(Request $request, Villa $villa, VillaService $villas)
     {
-        abort_unless($villa->owner_id === (int) $request->user()->id, 403, 'Seul le créateur de la villa peut la supprimer ici.');
+        abort_unless((int) $villa->owner_id === (int) $request->user()->id, 403, 'Seul le créateur de la villa peut la supprimer ici.');
 
         $villas->delete($villa, $request->user());
 
