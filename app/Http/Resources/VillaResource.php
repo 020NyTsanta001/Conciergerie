@@ -24,6 +24,10 @@ class VillaResource extends JsonResource
             'yacht_name' => $this->yacht_name,
             'yacht_description' => $this->yacht_description,
             'yacht_places' => $this->yacht_places,
+            // prix des services proposés par le propriétaire (Ar) ; null = non proposé
+            'chef_price' => $this->chef_price,
+            'chauffeur_price' => $this->chauffeur_price,
+            'yacht_price' => $this->has_yacht ? $this->yacht_price : null,
 
             'is_featured' => $this->is_featured,
             'status' => $this->status,

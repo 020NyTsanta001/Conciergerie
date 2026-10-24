@@ -6,8 +6,9 @@ import { useDots } from '../dots';
 const field = 'rounded-xl border border-neutral-300 px-3 py-2.5 text-sm w-full outline-none focus:border-black';
 const empty = {
     title: '', description: '', city: '', country: '', price_per_night: '',
-    bedrooms: 1, capacity: 2, has_pool: false, has_yacht: false, image: '',
+    bedrooms: 1, capacity: 2, has_pool: false, has_yacht: false, images: ['', '', ''],
     yacht_image: '', yacht_name: '', yacht_description: '', yacht_place1: '', yacht_place2: '',
+    chef_price: '', chauffeur_price: '', yacht_price: '',
 };
 const BADGE = { pending: 'bg-amber-100 text-amber-800', approved: 'bg-emerald-100 text-emerald-800', rejected: 'bg-rose-100 text-rose-800' };
 
@@ -36,9 +37,12 @@ export default function Host() {
         setF({
             title: v.title, description: v.description, city: v.city, country: v.country,
             price_per_night: fromAr(v.price_per_night), bedrooms: v.bedrooms, capacity: v.capacity,
-            has_pool: v.has_pool, has_yacht: v.has_yacht, image: v.images?.[0] ?? '',
+            has_pool: v.has_pool, has_yacht: v.has_yacht, images: [0, 1, 2].map((i) => v.images?.[i] ?? ''),
             yacht_image: v.yacht_image ?? '', yacht_name: v.yacht_name ?? '', yacht_description: v.yacht_description ?? '',
             yacht_place1: v.yacht_places?.[0] ?? '', yacht_place2: v.yacht_places?.[1] ?? '',
+            chef_price: v.chef_price != null ? fromAr(v.chef_price) : '',
+            chauffeur_price: v.chauffeur_price != null ? fromAr(v.chauffeur_price) : '',
+            yacht_price: v.yacht_price != null ? fromAr(v.yacht_price) : '',
         });
         formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
@@ -48,12 +52,14 @@ export default function Host() {
     const submit = async (e) => {
         e.preventDefault();
         setMsg('');
-        const { image, yacht_image, yacht_name, yacht_description, yacht_place1, yacht_place2, ...rest } = f;
-        // en modification, la photo saisie remplace la 1re photo ; les autres photos de la villa sont conservées
-        const others = editing ? (editing.images ?? []).slice(1) : [];
+        const { images, yacht_image, yacht_name, yacht_description, yacht_place1, yacht_place2, ...rest } = f;
         const body = {
             ...rest, price_per_night: toAr(rest.price_per_night),
-            images: image ? [image, ...others] : others,
+            images: images.map((u) => u.trim()), // exactement 3 photos, vérifié aussi par le serveur
+            // prix des services (monnaie du compte -> Ar) ; vide = service non proposé
+            chef_price: rest.chef_price !== '' ? toAr(rest.chef_price) : null,
+            chauffeur_price: rest.chauffeur_price !== '' ? toAr(rest.chauffeur_price) : null,
+            yacht_price: f.has_yacht && rest.yacht_price !== '' ? toAr(rest.yacht_price) : null,
             yacht_image: f.has_yacht ? yacht_image : null,
             yacht_name: f.has_yacht ? yacht_name.trim() : null,
             yacht_description: f.has_yacht ? yacht_description.trim() : null,
@@ -142,6 +148,7 @@ export default function Host() {
                         <input className={field} type="url" placeholder="Lien de la photo du yacht (https://…)" value={f.yacht_image} onChange={set('yacht_image')} required />
                         <input className={field} placeholder="Nom du yacht" maxLength={80} value={f.yacht_name} onChange={set('yacht_name')} required />
                         <textarea className={field} rows="3" maxLength={300} placeholder="Courte description du yacht (300 caractères max.)" value={f.yacht_description} onChange={set('yacht_description')} required />
+                        <input className={field} type="number" min="1" placeholder={`Prix de la sortie en yacht (${currencyLabel()})`} value={f.yacht_price} onChange={set('yacht_price')} required />
                         <div className="grid grid-cols-2 gap-3">
                             <input className={field} maxLength={80} placeholder="Lieu de sortie n°1" value={f.yacht_place1} onChange={set('yacht_place1')} required />
                             <input className={field} maxLength={80} placeholder="Lieu de sortie n°2 (facultatif)" value={f.yacht_place2} onChange={set('yacht_place2')} />
@@ -149,7 +156,29 @@ export default function Host() {
                     </div>
                 )}
 
-                <input className={field} type="url" placeholder="URL d'une photo de la villa (https://…)" value={f.image} onChange={set('image')} />
+                <div className="space-y-3 rounded-2xl bg-neutral-50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">Services que vous proposez (facultatif)</p>
+                    <p className="text-xs text-neutral-500">Indiquez votre prix pour chaque service que vous assurez ; laissez vide si vous ne le proposez pas.</p>
+                    <div className="grid grid-cols-2 gap-3">
+                        <input className={field} type="number" min="1" placeholder={`Chef à domicile (${currencyLabel()})`} value={f.chef_price} onChange={set('chef_price')} />
+                        <input className={field} type="number" min="1" placeholder={`Chauffeur privé (${currencyLabel()})`} value={f.chauffeur_price} onChange={set('chauffeur_price')} />
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500">Photos de la villa (exactement 3)</p>
+                    {[0, 1, 2].map((i) => (
+                        <input
+                            key={i}
+                            className={field}
+                            type="url"
+                            placeholder={`Lien de la photo ${i + 1} (https://…)`}
+                            value={f.images[i]}
+                            onChange={(e) => setF({ ...f, images: f.images.map((u, j) => (j === i ? e.target.value : u)) })}
+                            required
+                        />
+                    ))}
+                </div>
 
                 <div className="flex gap-3">
                     <button className="rounded-full bg-black text-white px-6 py-3 text-sm font-semibold">{editing ? 'Enregistrer les modifications' : 'Soumettre'}</button>

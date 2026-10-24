@@ -7,9 +7,10 @@ use App\Models\Villa;
 use App\Support\Money;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
+use Illuminate\Validation\ValidationException;
 
 
-/** Tarification : prix par nuit de la villa × nombre de nuits + services. */
+/** Tarification : prix par nuit de la villa × nombre de nuits + services (au prix fixé par le propriétaire de la villa). */
 class PricingService
 {
     /** @param array<int, array{id:int, quantity?:int}> $serviceLines */
@@ -26,12 +27,19 @@ class PricingService
 
         $quantities = collect($serviceLines)->pluck('quantity', 'id');
         $services = Service::whereIn('id', $quantities->keys())->where('is_active', true)->get()
-            ->map(fn ($s) => [
-                'id' => $s->id,
-                'name' => $s->name,
-                'quantity' => max(1, (int) ($quantities[$s->id] ?? 1)),
-                'unit_price' => (float) $s->price,
-            ]);
+            ->map(function ($s) use ($villa, $quantities) {
+                $price = $villa->servicePrice($s->type); // prix du propriétaire, et non plus celui du catalogue
+                if ($price === null) {
+                    throw ValidationException::withMessages(['services' => "« {$s->name} » n'est pas proposé pour cette villa."]);
+                }
+
+                return [
+                    'id' => $s->id,
+                    'name' => $s->name,
+                    'quantity' => max(1, (int) ($quantities[$s->id] ?? 1)),
+                    'unit_price' => (float) $price,
+                ];
+            });
         $servicesTotal = $services->sum(fn ($s) => $s['quantity'] * $s['unit_price']);
 
         $total = Money::round($stay + $servicesTotal);

@@ -12,7 +12,21 @@ class Villa extends Model
 
     protected function casts(): array
     {
-        return ['has_pool' => 'boolean', 'has_yacht' => 'boolean', 'is_featured' => 'boolean', 'price_per_night' => 'float', 'yacht_places' => 'array'];
+        return ['has_pool' => 'boolean', 'has_yacht' => 'boolean', 'is_featured' => 'boolean', 'price_per_night' => 'float', 'yacht_places' => 'array',
+            'chef_price' => 'integer', 'chauffeur_price' => 'integer', 'yacht_price' => 'integer'];
+    }
+
+    /** Prix (Ar) d'un service proposé par le propriétaire de cette villa : chef | chauffeur | yacht. null = non proposé. */
+    public function servicePrice(string $type): ?int
+    {
+        $price = match ($type) {
+            'chef' => $this->chef_price,
+            'chauffeur' => $this->chauffeur_price,
+            'yacht' => $this->has_yacht ? $this->yacht_price : null, // pas de yacht sur la villa : pas de sortie en yacht
+            default => null,
+        };
+
+        return $price === null ? null : (int) $price;
     }
 
     public function owner() { return $this->belongsTo(User::class, 'owner_id'); }

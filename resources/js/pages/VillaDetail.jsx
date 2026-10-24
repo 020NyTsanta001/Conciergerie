@@ -5,6 +5,10 @@ import { useAuth } from '../auth';
 import Reviews from '../components/Reviews';
 import { Stars } from '../components/Stars';
 
+// dates au format AAAA-MM-JJ en heure locale (toISOString donnerait la date UTC, parfois la veille)
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const addDays = (s, n) => { const d = new Date(`${s}T00:00:00`); d.setDate(d.getDate() + n); return iso(d); };
+
 const field = 'rounded-xl border border-neutral-300 px-3 py-2.5 text-sm w-full outline-none focus:border-black';
 
 export default function VillaDetail() {
@@ -13,6 +17,7 @@ export default function VillaDetail() {
     // l'admin et le propriétaire ne réservent pas : ils doivent d'abord se connecter avec un compte voyageur
     const isStaff = user?.role === 'admin' || user?.role === 'host';
     const nav = useNavigate();
+    const today = iso(new Date());
     const [villa, setVilla] = useState(null);
     const [services, setServices] = useState([]);
     const [form, setForm] = useState({ check_in: '', check_out: '', guests: 2 });
@@ -38,13 +43,21 @@ export default function VillaDetail() {
     useEffect(() => {
         setQuote(null);
         setError('');
-        if (!user || isStaff || !form.check_in || !form.check_out || form.check_out <= form.check_in) return;
-        api('/bookings/quote', { method: 'POST', body: payload() }).then(setQuote).catch((e) => setError(e.message));
+        if (!user || isStaff || !form.check_in || !form.check_out || form.check_in < today || form.check_out <= form.check_in || !(Number(form.guests) >= 1)) return undefined;
+        // on attend 400 ms après le dernier changement avant de demander le devis, et on ignore les réponses périmées
+        let stale = false;
+        const t = setTimeout(() => {
+            api('/bookings/quote', { method: 'POST', body: payload() })
+                .then((q) => { if (!stale) setQuote(q); })
+                .catch((e) => { if (!stale) setError(e.message); });
+        }, 400);
+        return () => { stale = true; clearTimeout(t); };
     }, [form, picked, user]); // eslint-disable-line
 
     const reserve = async () => {
         if (!user) return nav('/login');
         setError('');
+        if (!form.check_in || !form.check_out) return setError("Choisissez vos dates d'arrivée et de départ.");
         try {
             await api('/bookings', { method: 'POST', body: payload() });
             nav('/bookings');
@@ -53,6 +66,9 @@ export default function VillaDetail() {
 
     if (notFound) return <p className="p-10 text-neutral-500">Cette villa n'existe pas ou n'est plus disponible.</p>;
     if (!villa) return <p className="p-10 text-neutral-500">Chargement…</p>;
+
+    // services proposés par le propriétaire de cette villa, à son prix (type : chef | chauffeur | yacht)
+    const offered = services.map((s) => ({ ...s, price: villa[`${s.type}_price`] })).filter((s) => s.price != null);
 
     return (
         <div className="mx-auto max-w-7xl px-5 py-10 grid lg:grid-cols-3 gap-10">
@@ -76,19 +92,31 @@ export default function VillaDetail() {
             <aside className="rounded-3xl border border-neutral-200 p-6 h-fit sticky top-24 space-y-4">
                 <p className="text-2xl font-semibold">{eur(villa.price_per_night)} <span className="text-sm font-normal text-neutral-500">/ nuit</span></p>
                 <div className="grid grid-cols-2 gap-3">
-                    <input className={field} type="date" value={form.check_in} onChange={(e) => setForm({ ...form, check_in: e.target.value })} />
-                    <input className={field} type="date" value={form.check_out} onChange={(e) => setForm({ ...form, check_out: e.target.value })} />
+                    <input
+                        className={field} type="date" aria-label="Arrivée" min={today} value={form.check_in}
+                        onChange={(e) => {
+                            const v = e.target.value;
+                            // si le départ n'est plus après la nouvelle arrivée, on le vide
+                            setForm({ ...form, check_in: v, check_out: form.check_out && form.check_out <= v ? '' : form.check_out });
+                        }}
+                    />
+                    <input
+                        className={field} type="date" aria-label="Départ" min={addDays(form.check_in || today, 1)} value={form.check_out}
+                        onChange={(e) => setForm({ ...form, check_out: e.target.value })}
+                    />
                 </div>
-                <input className={field} type="number" min="1" max={villa.capacity} value={form.guests} onChange={(e) => setForm({ ...form, guests: e.target.value })} />
+                <input className={field} type="number" min="1" max={villa.capacity} value={form.guests} onChange={(e) => setForm({ ...form, guests: e.target.value })} onBlur={() => setForm((f) => ({ ...f, guests: Math.min(Math.max(Number(f.guests) || 1, 1), villa.capacity) }))} />
+                {offered.length > 0 && (
                 <div>
                     <p className="text-sm font-semibold mb-2">Services exclusifs</p>
-                    {services.map((s) => (
+                    {offered.map((s) => (
                         <label key={s.id} className="flex justify-between text-sm py-1">
                             <span><input type="checkbox" className="mr-2" checked={!!picked[s.id]} onChange={(e) => setPicked({ ...picked, [s.id]: e.target.checked })} />{s.name}</span>
                             <span className="text-neutral-500">{eur(s.price)}</span>
                         </label>
                     ))}
                 </div>
+                )}
                 {quote && (
                     <div className="text-sm border-t pt-4 space-y-1">
                         <p className="flex justify-between"><span>{quote.nights_count} nuit(s)</span><span>{eur(quote.stay_total)}</span></p>

@@ -38,19 +38,31 @@ class HostController extends Controller
             'yacht_description' => [$yacht, 'nullable', 'string', 'max:300'],
             'yacht_places' => [$yacht, 'nullable', 'array', 'min:1', 'max:2'],
             'yacht_places.*' => ['required', 'string', 'max:80'],
-            'images' => 'array|max:10',
-            'images.*' => 'url',
+            // prix des services en Ariary ; vide = le propriétaire ne propose pas ce service
+            'chef_price' => 'nullable|integer|min:1',
+            'chauffeur_price' => 'nullable|integer|min:1',
+            'yacht_price' => [$yacht, 'nullable', 'integer', 'min:1'],
+            'images' => 'required|array|size:3',          // exactement 3 photos
+            'images.*' => 'required|url|max:500|distinct',
         ], [
+            'images.required' => 'Ajoutez exactement 3 liens de photos.',
+            'images.size' => 'Il faut exactement 3 liens de photos de la villa.',
+            'images.*.required' => 'Les 3 liens de photos sont obligatoires.',
+            'images.*.url' => 'Chaque photo doit être un lien valide (https://…).',
+            'images.*.distinct' => 'Les 3 photos doivent être différentes.',
             'yacht_image.required' => 'Ajoutez le lien de la photo du yacht.',
             'yacht_name.required' => 'Indiquez le nom du yacht.',
             'yacht_description.required' => 'Ajoutez une courte description du yacht.',
             'yacht_places.required' => 'Indiquez au moins un lieu de sortie.',
+            'yacht_price.required' => 'Indiquez le prix de la sortie en yacht.',
+            'chef_price.integer' => 'Le prix du chef doit être un nombre entier.',
+            'chauffeur_price.integer' => 'Le prix du chauffeur doit être un nombre entier.',
         ]);
 
         $attributes = collect($data)->except('images')->all();
         if (empty($attributes['has_yacht'])) {      // pas de yacht : on ne garde aucune information de yacht
             $attributes['has_yacht'] = false;
-            foreach (['yacht_image', 'yacht_name', 'yacht_description', 'yacht_places'] as $k) {
+            foreach (['yacht_image', 'yacht_name', 'yacht_description', 'yacht_places', 'yacht_price'] as $k) {
                 $attributes[$k] = null;
             }
         }
