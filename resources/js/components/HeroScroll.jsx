@@ -12,6 +12,7 @@ export default function HeroScroll({ image, stats }) {
     const pin = useRef(null);   // écran figé (sticky)
     const img = useRef(null);
     const [step, setStep] = useState(0); // nombre d'éléments visibles (0 à 4)
+    const [clicked, setClicked] = useState(false); // vrai après un clic sur « Explorer »
 
     useEffect(() => {
         let raf = 0;
@@ -26,6 +27,7 @@ export default function HeroScroll({ image, stats }) {
             // p = 0 → quart gauche caché ; p = 1 → quart droit caché.
             img.current.style.transform = `translateX(${-25 * (1 - p)}%)`;
             setStep(STEPS.filter((s) => p >= s).length);
+            if (r.bottom <= 2) setClicked(false); // le hero est sorti de l'écran : le bouton est prêt à réapparaître
         };
 
         const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
@@ -96,16 +98,22 @@ export default function HeroScroll({ image, stats }) {
                         </p>
                     </div>
 
-                    <div className="p-8 md:p-16 flex flex-wrap items-end justify-between gap-6">
-                                                <button
-                            type="button"
-                            onClick={goToNext}
-                            className="inline-block rounded-full border border-white/70 bg-transparent px-8 py-4 text-sm font-semibold text-white transition-colors hover:bg-white/15"
-                        >
-                            Explorer
-                        </button>
+                    <div className="p-8 md:p-16 grid items-end gap-6 md:grid-cols-3">
+                        {/* colonne vide : garde le bouton au centre */}
+                        <div className="hidden md:block" />
+
+                        <div className={`justify-self-center transition-opacity duration-1000 ease-in-out ${clicked ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                            <button
+                                type="button"
+                                onClick={() => { setClicked(true); goToNext(); }}
+                                className="inline-block rounded-full border border-white/70 bg-transparent px-8 py-4 text-sm font-semibold text-white transition-colors hover:bg-white/15"
+                            >
+                                Explorer
+                            </button>
+                        </div>
+
                         {stats && (
-                            <div className={`flex gap-4 ${reveal(step >= 4)}`}>
+                            <div className={`flex gap-4 justify-self-center md:justify-self-end ${reveal(step >= 4)}`}>
                                 {[[`${stats.properties}+`, 'Propriétés'], [`${stats.years_experience}+`, "Ans d'expérience"]].map(([n, l]) => (
                                     <div key={l} className="rounded-2xl bg-white/85 backdrop-blur px-6 py-4 text-neutral-900">
                                         <p className="text-3xl font-medium">{n}</p><p className="text-xs text-neutral-600">{l}</p>
