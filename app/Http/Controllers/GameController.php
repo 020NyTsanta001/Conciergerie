@@ -35,7 +35,7 @@ class GameController extends Controller
     public function finish(Request $request, GameSession $session, WalletService $wallet)
     {
         $user = $request->user();
-        abort_unless($session->user_id === $user->id, 403);
+        abort_unless((int) $session->user_id === (int) $user->id, 403);
 
         $cfg = config('money.pacman');
 

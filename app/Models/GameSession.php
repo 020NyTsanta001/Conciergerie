@@ -10,6 +10,6 @@ class GameSession extends Model
 
     protected function casts(): array
     {
-        return ['started_at' => 'datetime', 'finished_at' => 'datetime', 'paid' => 'boolean'];
+        return ['user_id' => 'integer', 'started_at' => 'datetime', 'finished_at' => 'datetime', 'paid' => 'boolean'];
     }
 }
