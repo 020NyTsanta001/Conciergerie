@@ -18,6 +18,7 @@ use App\Http\Controllers\WalletController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AdminMessageController;
+use App\Http\Controllers\GameController;
 
 Route::prefix('v1')->group(function () {
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:10,1');
@@ -39,6 +40,8 @@ Route::prefix('v1')->group(function () {
         Route::patch('account/currency', [AccountController::class, 'updateCurrency']);
         Route::get('wallet', [WalletController::class, 'show']);
         Route::post('wallet/claim', [WalletController::class, 'claim']);
+        Route::post('games/pacman/start', [GameController::class, 'start'])->middleware('throttle:10,1');
+        Route::post('games/pacman/{session}/finish', [GameController::class, 'finish'])->middleware('throttle:10,1');
         Route::post('bookings/{booking}/review', [ReviewController::class, 'store']);
         Route::put('reviews/{review}', [ReviewController::class, 'update']);
         Route::delete('reviews/{review}', [ReviewController::class, 'destroy']);

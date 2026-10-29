@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\WalletTransaction;
+use App\Models\GameSession;
 use App\Services\WalletService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -18,6 +19,9 @@ class WalletController extends Controller
             'balance' => (int) $u->balance,
             'rewards' => config('money.rewards'),
             'claimed' => WalletTransaction::where('user_id', $u->id)->whereNotNull('reward_key')->pluck('reward_key'),
+            'pacman' => config('money.pacman') + [
+                'games_played' => GameSession::where('user_id', $u->id)->where('game', 'pacman')->count(),
+            ],
             'transactions' => WalletTransaction::where('user_id', $u->id)->orderByDesc('id')->limit(20)
                 ->get(['id', 'type', 'amount', 'balance_after', 'description', 'created_at']),
         ];

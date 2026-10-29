@@ -31,6 +31,12 @@ class WalletService
         return $this->apply($user, $amount, 'reward', "Bonus de visite : {$key}", null, $key);
     }
 
+    /** Gain d'une partie : clé unique par partie, donc non bloqué par « un bonus par bouton ». */
+    public function creditGame(User $user, int $amount, int $sessionId): WalletTransaction
+    {
+        return $this->apply($user, $amount, 'reward', 'Gain Pac-Man', null, "pacman:{$sessionId}");
+    }
+
     private function apply(
         User $user, int $amount, string $type, string $description,
         ?int $bookingId = null, ?string $rewardKey = null, string $insufficient = 'Solde insuffisant.'

@@ -22,6 +22,14 @@ return [
         'cv' => 1_000_000,          // « Mon CV »
     ],
 
+    // Pac-Man : un palier toutes les 20 s de jeu, 2 parties rémunérées par compte
+    'pacman' => [
+        'max_paid_games' => 2,
+        'step_seconds' => 20,
+        'step_amount' => 1_000_000,
+        'max_steps' => 5,      // 100 s = 5 000 000 Ar
+    ],
+
     // Encaissement du voyageur : 'wallet' (simulé). Plus tard : 'mvola', 'stripe'…
     'payment_driver' => env('PAYMENT_DRIVER', 'wallet'),
 ];

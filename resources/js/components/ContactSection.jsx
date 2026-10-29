@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, eur } from '../api';
 import { useAuth } from '../auth';
+import PacmanModal from './PacmanModal';
 
-// ⚠️ À renseigner : adresse du GitHub de l'entreprise (stage). Vide = bouton grisé, sans bonus.
+
 const LINKS = {
     github: 'https://github.com/020NyTsanta001',
     orgGithub: 'https://github.com/MIT452', // '
-    cv: '/cv.pdf',  // fichier à placer dans public/cv.pdf
+    cv: '/cv.pdf',  
 };
 const PHOTO = '/images/profile.webp';
 
@@ -51,6 +52,7 @@ export default function ContactSection() {
     const [wallet, setWallet] = useState(null);   // bonus disponibles et déjà récupérés
     const [toast, setToast] = useState('');
     const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+    const [playing, setPlaying] = useState(false);
 
     useEffect(() => {
         if (user) api('/wallet').then(setWallet).catch(() => {});
@@ -71,6 +73,12 @@ export default function ContactSection() {
 
     const reward = (key) => (wallet ? wallet.rewards[key] : undefined);
     const claimed = (key) => !!wallet?.claimed.includes(key);
+    const pac = wallet?.pacman;
+    const gamesLeft = pac ? Math.max(0, pac.max_paid_games - pac.games_played) : 0;
+    const openPacman = () => {
+        if (!user) { setToast('Connectez-vous pour jouer et gagner un bonus.'); return; }
+        setPlaying(true);
+    };
 
     const submit = async (e) => {
         e.preventDefault();
@@ -119,10 +127,31 @@ export default function ContactSection() {
                         <LinkButton href={LINKS.github} reward={reward('github')} claimed={claimed('github')} onVisit={visit('github')}>Mon GitHub</LinkButton>
                         <LinkButton href={LINKS.orgGithub} reward={reward('org_github')} claimed={claimed('org_github')} onVisit={visit('org_github')}>GitHub de l'entreprise (stage)</LinkButton>
                         <LinkButton href={LINKS.cv} reward={reward('cv')} claimed={claimed('cv')} onVisit={visit('cv')}>Mon CV</LinkButton>
-                        <p className="text-xs text-neutral-500">
-                            {toast || 'Chaque lien visité offre un bonus à votre solde (une fois par compte, connexion requise).'}
-                        </p>
+
+                        <button type="button" onClick={openPacman}
+                            className="flex w-full items-center justify-between gap-2 rounded-full border border-neutral-300 px-5 py-3.5 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-50">
+                            <span className="flex-1 text-left">Jouer à Pac-Man</span>
+                            {pac && (
+                                <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-600">
+                                    {gamesLeft > 0 ? `jusqu'à +${eur(pac.step_amount * pac.max_steps)}` : 'bonus épuisé'}
+                                </span>
+                            )}
+                            <span aria-hidden="true">▶</span>
+                        </button>
+
+                        {toast && <p className="text-xs text-neutral-500">{toast}</p>}
+                    
                     </div>
+
+                    {playing && (
+                        <PacmanModal
+                            pac={pac}
+                            gamesLeft={gamesLeft}
+                            onClose={() => setPlaying(false)}
+                            onDone={() => { refresh(); api('/wallet').then(setWallet).catch(() => {}); }}
+                        />
+                    )}
+
                 </div>
 
                 {/* Droite : formulaire (inchangé) */}
