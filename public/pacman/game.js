@@ -108,12 +108,20 @@ let onGhostCollision = () => {
     }
     restartPacmanAndGhosts();
 };
+//entre par le côté et sort par l autre
+let wrapAround = (entity) => {
+    const mapWidth= map[0].length * oneBlockSize;
+    if (entity.x <= -oneBlockSize) entity.x = mapWidth;
+    else if (entity.x >= mapWidth) entity.x = -oneBlockSize;
+}
 
 let update = () => {
     if (!started || gameOver) return;   // rien ne bouge avant le premier mouvement
     pacman.moveProcess();
+    wrapAround(pacman);
     pacman.eat();
     updateGhosts();
+    ghosts.forEach(wrapAround);
     if (pacman.checkGhostCollision(ghosts)) {
         onGhostCollision();
     } else if (!map.some((row) => row.includes(2))) {
