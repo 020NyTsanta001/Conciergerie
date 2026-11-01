@@ -114,7 +114,7 @@ export default function HeroScroll({ image, stats }) {
             target = p * (N - 1);
             if (!raf) raf = requestAnimationFrame(tick);
             setStep(STEPS.filter((s) => p >= s).length);
-            if (r.bottom <= 2) setClicked(false);
+            setClicked(window.scrollY > 8);
         };
 
         const onScroll = () => { if (!scrollRaf) scrollRaf = requestAnimationFrame(update); };
@@ -165,9 +165,9 @@ export default function HeroScroll({ image, stats }) {
 
         const start = window.scrollY;
         const dist = target.getBoundingClientRect().top;
-        const duration = Math.min(3500, Math.max(1200, (dist / window.innerHeight) * 450)); // 1,2 s (fin de hero) → 3,5 s (depuis le haut)
+        const duration = Math.min(6500, Math.max(1800, (dist / window.innerHeight) * 600)); // 1,8s fin du hero, 6s depuis le haut
         const t0 = performance.now();
-        const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+        const ease = (t) => (t < 0.5 ? 2 * t * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
         let cancelled = false;
         const cancel = () => { cancelled = true; };
@@ -217,10 +217,8 @@ export default function HeroScroll({ image, stats }) {
                         </p>
                     </div>
 
-                    <div className="p-8 md:p-16 grid items-end gap-6 md:grid-cols-3">
-                        <div className="hidden md:block" />
-
-                        <div className={`justify-self-center transition-opacity duration-1000 ease-in-out ${clicked ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                    <div className="p-8 md:p-16 flex flex-wrap items-end justify-between gap-6">
+                        <div className={`transition-opacity duration-1000 ease-in-out ${clicked ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                             <button
                                 type="button"
                                 onClick={() => { setClicked(true); goToNext(); }}
@@ -231,7 +229,7 @@ export default function HeroScroll({ image, stats }) {
                         </div>
 
                         {stats && (
-                            <div className={`flex gap-4 justify-self-center md:justify-self-end ${reveal(step >= 4)}`}>
+                            <div className={`flex gap-4 ${reveal(step >= 4)}`}>
                                 {[[`${stats.properties}+`, 'Propriétés'], [`${stats.years_experience}+`, "Ans d'expérience"]].map(([n, l]) => (
                                     <div key={l} className="rounded-2xl bg-white/85 backdrop-blur px-6 py-4 text-neutral-900">
                                         <p className="text-3xl font-medium">{n}</p><p className="text-xs text-neutral-600">{l}</p>

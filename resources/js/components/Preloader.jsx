@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { loadHeroFrames } from './heroFrames';
+
 
 const MIN_MS = 700;   // durée minimale d'affichage (évite un flash quand tout est déjà en cache)
-const MAX_MS = 6000;  // sécurité : on entre dans le site quoi qu'il arrive
+const MAX_MS = 15000;  // sécurité : on entre dans le site quoi qu'il arrive
 const WEIGHTS = { logos: 2, hero: 5, fonts: 2 };
 const TOTAL = Object.values(WEIGHTS).reduce((a, b) => a + b, 0);
 
@@ -17,6 +19,8 @@ const loadImage = (src) =>
         else { img.onload = resolve; img.onerror = resolve; }
     });
 
+
+
 export default function Preloader() {
     const [done, setDone] = useState({});
     const [shown, setShown] = useState(0);
@@ -26,7 +30,7 @@ export default function Preloader() {
     const target = useRef(0);
     const destination = useRef(window.location.pathname); // page vers laquelle on charge
 
-    const finish = (key) => setDone((d) => (d[key] ? d : { ...d, [key]: true }));
+    const finish = (key, value = true) => setDone((d) => (d[key] === value ? d : { ...d, [key]: value }));
 
     // Relance à la demande :
     //   window.dispatchEvent(new CustomEvent('preloader:show', { detail: { to: '/' } }))
@@ -50,7 +54,7 @@ export default function Preloader() {
         const pageImage = path === '/' ? HERO : null;
 
         Promise.all([loadImage('/images/logo-black.svg'), loadImage('/images/logo-white.svg')]).then(() => finish('logos'));
-        (pageImage ? loadImage(pageImage) : Promise.resolve()).then(() => finish('hero'));
+        (pageImage ? Promise.all([loadImage(pageImage), loadHeroFrames((p) => finish('hero', p))]) : Promise.resolve()).then(() => finish('hero', true));
         (document.fonts
             ? Promise.all([document.fonts.load('16px "Manrope Variable"'), document.fonts.ready])
             : Promise.resolve()
@@ -59,7 +63,7 @@ export default function Preloader() {
     }, [run]);
 
     // 2) Pourcentage réel visé
-    target.current = (Object.entries(WEIGHTS).reduce((s, [k, w]) => s + (done[k] ? w : 0), 0) / TOTAL) * 100;
+    target.current = (Object.entries(WEIGHTS).reduce((s, [k, w]) => s + w * (done[k] === true ? 1 : done[k] || 0), 0) / TOTAL) * 100;
 
     // 3) Barre fluide : le pourcentage affiché rattrape progressivement le pourcentage réel
     const active = phase !== 'gone';
