@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Hoxen - Concièrgerie d'élite</title>
         <script>window.__MONEY__ = @json(['usd_rate' => config('money.usd_rate')]);</script>
+        <script>window.__BOOKING__ = @json(['max_nights' => config('booking.max_nights')]);</script>
         @viteReactRefresh
         @vite(['resources/css/app.css', 'resources/js/app.jsx'])
         <link rel="icon" type="image/svg+xml" href="{{ asset('images/logo-white.svg') }}">

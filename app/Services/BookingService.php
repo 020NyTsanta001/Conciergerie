@@ -20,7 +20,7 @@ class BookingService
 {
     public function __construct(
         private PricingService $pricing,
-        private PaymentGateway $gateway,  // encaissement du voyageur : simulé aujourd'hui, prestataire réel demain
+        private PaymentGateway $gateway,  // encaissement du voyageur 
         private WalletService $wallet,    // soldes internes : hôte et plateforme
     ) {}
 

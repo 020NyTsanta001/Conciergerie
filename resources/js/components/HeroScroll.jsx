@@ -1,26 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { FRAME_COUNT, getHeroFrames, setHeroFocus, startHeroFrames, subscribeHeroFrames } from './heroFrames';
 
 /* ───────── RÉGLAGES ───────── */
 
-// Séquence d'images générée par ffmpeg (f_001.webp, f_002.webp, …)
-const FRAMES_DESKTOP = '/images/hero-frames';
-const FRAMES_MOBILE = '/images/hero-frames-m';
-const FRAME_COUNT = 125; 
-const PAD = 3;          
-const EXT = 'webp';
-
 // Longueur du hero : plus c'est grand, plus la séquence est lente.
-// 600vh ≈ 2x · 800vh ≈ 1,5x · 1000vh ≈ 1x (vitesse de la vidéo d'origine, scroll normal)
-const HERO_HEIGHT = '1000vh';
+const HERO_HEIGHT = '450vh';
 
 // Inertie du scrub : 0.1 = très doux, 0.3 = très réactif.
-const SMOOTH = 0.16;
+const SMOOTH = 0.13;
 
-// true : les visiteurs ayant « réduire les animations » dans leur OS voient l'image fixe seule.
-const RESPECT_REDUCED_MOTION = false;
+// Bouton « Explorer » : durée par écran de défilement (plus grand = plus lent)
+const MS_PER_SCREEN = 625;
+const MIN_MS = 2500;
+const MAX_MS = 20000;
 
 // Seuils de progression du scroll (0 → 1) auxquels chaque élément apparaît :
-// 1) Where  2) Life Belongs + bouton Explorer  3) paragraphe  4) chiffres
+// 1) Where  2) Life Belongs  3) paragraphe  4) chiffres
 const STEPS = [0.1, 0.3, 0.5, 0.7];
 
 /* ──────────────────────────── */
@@ -28,52 +23,31 @@ const STEPS = [0.1, 0.3, 0.5, 0.7];
 const reveal = (on) =>
     `transition-all duration-700 ease-out ${on ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6 pointer-events-none'}`;
 
-const isStill = () =>
-    RESPECT_REDUCED_MOTION && typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+// useLayoutEffect côté navigateur : la 1re image est dessinée AVANT le premier affichage (pas d'écran noir)
+const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
-// Ordre de chargement « grossier → fin » : 1re, dernière, puis 1 image sur 32, sur 8, sur 4, sur 2, le reste.
-// Ainsi, même si l'utilisateur scrolle vite pendant le chargement, il voit toujours quelque chose de cohérent.
-const loadOrder = (n) => {
-    const seen = new Set([0, n - 1]);
-    const out = [0, n - 1];
-    [32, 8, 4, 2, 1].forEach((stride) => {
-        for (let i = 0; i < n; i += stride) if (!seen.has(i)) { seen.add(i); out.push(i); }
-    });
-    return out;
-};
-
-// props : image (affichée jusqu'à l'arrivée de la 1re image de la séquence), stats
-export default function HeroScroll({ image, stats }) {
+export default function HeroScroll({ stats }) {
     const box = useRef(null);    // grand conteneur : sert à mesurer le scroll
     const pin = useRef(null);    // écran figé (sticky)
     const canvas = useRef(null); // affichage de la séquence
     const [step, setStep] = useState(0);
     const [clicked, setClicked] = useState(false);
-    const [ready, setReady] = useState(false); // vrai dès que la 1re image est dessinée
-    const [still] = useState(isStill);
 
-    useEffect(() => {
-        if (still) return;
-
+    useIsoLayoutEffect(() => {
         const N = FRAME_COUNT;
-        const dir = window.innerWidth < 768 ? FRAMES_MOBILE : FRAMES_DESKTOP;
-        const url = (i) => `${dir}/f_${String(i + 1).padStart(PAD, '0')}.${EXT}`;
-
-        const imgs = new Array(N).fill(null); // images chargées
-        let dead = false;
-        let shown = false;
+        const imgs = getHeroFrames(); // tableau partagé avec le preloader, rempli au fil du chargement
         let raf = 0;       // boucle d'animation
-        let scrollRaf = 0; // throttle du scroll
-        let target = 0;    // position visée (en numéro d'image, décimal)
+        let scrollRaf = 0; // limite le scroll à 1 calcul par image
+        let target = 0;    // position visée (numéro d'image, décimal)
         let current = 0;   // position lissée
 
-        // plus proche image chargée en partant de i, vers le bas (step = -1) ou le haut (step = +1)
-        const find = (i, step) => {
-            for (let k = i; k >= 0 && k < N; k += step) if (imgs[k]) return k;
+        // image chargée la plus proche de i, vers le bas (-1) ou le haut (+1)
+        const find = (i, dir) => {
+            for (let k = i; k >= 0 && k < N; k += dir) if (imgs[k]) return k;
             return -1;
         };
 
-        // Dessine l'image courante ; entre deux images, fondu de l'une vers l'autre pour adoucir le rendu
+        // Dessine la position courante ; entre deux images, fondu de l'une vers l'autre
         const render = () => {
             const c = canvas.current;
             if (!c) return;
@@ -89,11 +63,13 @@ export default function HeroScroll({ image, stats }) {
             ctx.globalAlpha = 1;
             ctx.drawImage(A, 0, 0, c.width, c.height);
             if (b !== a) {
-                ctx.globalAlpha = (current - a) / (b - a);
-                ctx.drawImage(imgs[b], 0, 0, c.width, c.height);
-                ctx.globalAlpha = 1;
+                const t = (current - a) / (b - a);
+                if (t > 0.01) {
+                    ctx.globalAlpha = t;
+                    ctx.drawImage(imgs[b], 0, 0, c.width, c.height);
+                    ctx.globalAlpha = 1;
+                }
             }
-            if (!shown) { shown = true; setReady(true); }
         };
 
         // La boucle ne tourne que tant que l'image n'a pas rattrapé le scroll : scroll arrêté → 0 % CPU
@@ -105,69 +81,48 @@ export default function HeroScroll({ image, stats }) {
             if (current !== target) raf = requestAnimationFrame(tick);
         };
 
-        const update = () => {
+        const update = (snap = false) => {
             scrollRaf = 0;
             const r = box.current.getBoundingClientRect();
             const total = r.height - pin.current.offsetHeight;
             const p = total > 0 ? Math.min(1, Math.max(0, -r.top / total)) : 0;
 
             target = p * (N - 1);
-            if (!raf) raf = requestAnimationFrame(tick);
+            setHeroFocus(Math.round(target)); // le chargement en arrière-plan suit le visiteur
+            if (snap) { current = target; render(); } // affichage immédiat, sans attendre l'animation
+            else if (!raf) raf = requestAnimationFrame(tick);
             setStep(STEPS.filter((s) => p >= s).length);
             setClicked(window.scrollY > 8);
         };
 
-        const onScroll = () => { if (!scrollRaf) scrollRaf = requestAnimationFrame(update); };
+        const onScroll = () => { if (!scrollRaf) scrollRaf = requestAnimationFrame(() => update()); };
 
-        // Chargement progressif : 4 images en parallèle maximum
-        const queue = loadOrder(N);
-        let active = 0;
-        const pump = () => {
-            while (!dead && active < 4 && queue.length) {
-                const i = queue.shift();
-                const im = new Image();
-                im.decoding = 'async';
-                active++;
-                im.onload = () => {
-                    active--;
-                    imgs[i] = im;
-                    if (!raf) raf = requestAnimationFrame(tick); // redessine si cette image est utile maintenant
-                    pump();
-                };
-                im.onerror = () => {
-                    active--;
-                    if (i === 0) console.warn('[HeroScroll] image introuvable :', im.src);
-                    pump();
-                };
-                im.src = url(i);
-            }
-        };
+        // Redessine quand une nouvelle image arrive (utile si elle est proche de la position actuelle)
+        const unsub = subscribeHeroFrames(() => { if (!raf) raf = requestAnimationFrame(tick); });
+        startHeroFrames(); // sans effet si le preloader l'a déjà lancé
 
-        update();
-        pump();
+        update(true);
         window.addEventListener('scroll', onScroll, { passive: true });
         window.addEventListener('resize', onScroll);
         return () => {
-            dead = true;
-            queue.length = 0;
+            unsub();
             cancelAnimationFrame(raf);
             cancelAnimationFrame(scrollRaf);
             window.removeEventListener('scroll', onScroll);
             window.removeEventListener('resize', onScroll);
         };
-    }, [still]);
+    }, []);
 
     // Défilement animé vers « Every Home Begins » ; la séquence suit puisqu'elle est pilotée par le scroll.
-    // Durée proportionnelle à la distance : sinon toute la séquence défilerait en 1,2 s.
     const goToNext = () => {
         const target = document.getElementById('every-home');
         if (!target) return;
 
         const start = window.scrollY;
         const dist = target.getBoundingClientRect().top;
-        const duration = Math.min(6500, Math.max(1800, (dist / window.innerHeight) * 600)); // 1,8s fin du hero, 6s depuis le haut
+        const duration = Math.min(MAX_MS, Math.max(MIN_MS, (dist / window.innerHeight) * MS_PER_SCREEN));
         const t0 = performance.now();
-        const ease = (t) => (t < 0.5 ? 2 * t * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+        const ease = (t) => -(Math.cos(Math.PI * t) - 1) / 2; // départ et arrivée doux
 
         let cancelled = false;
         const cancel = () => { cancelled = true; };
@@ -188,20 +143,10 @@ export default function HeroScroll({ image, stats }) {
         requestAnimationFrame(tick);
     };
 
-    const mediaClass = 'absolute inset-0 h-full w-full object-cover';
-
     return (
         <section id="hero" ref={box} className="relative -mt-24 bg-neutral-900" style={{ height: HERO_HEIGHT }}>
             <div ref={pin} className="sticky top-0 h-svh overflow-hidden bg-neutral-900">
-                {/* l'image reste dessous tant que la séquence n'a rien affiché (ou si elle est introuvable) */}
-                {image && <img src={image} alt="" className={mediaClass} />}
-                {!still && (
-                    <canvas
-                        ref={canvas}
-                        aria-hidden="true"
-                        className={`${mediaClass} transition-opacity duration-500 ${ready ? 'opacity-100' : 'opacity-0'}`}
-                    />
-                )}
+                <canvas ref={canvas} aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
                 {/* voiles pour garder texte et header lisibles */}
                 <div className="absolute inset-0 bg-black/20" />
                 <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/50 to-transparent" />
@@ -222,7 +167,7 @@ export default function HeroScroll({ image, stats }) {
                             <button
                                 type="button"
                                 onClick={() => { setClicked(true); goToNext(); }}
-                                className="inline-block rounded-full border border-white/70 bg-transparent px-8 py-4 text-sm font-semibold text-white transition-colors hover:bg-white/15"
+                                className="inline-block rounded-full border border-white bg-transparent px-8 py-4 text-sm font-semibold text-white transition-colors hover:bg-white/15"
                             >
                                 Explorer
                             </button>

@@ -12,7 +12,7 @@ class StatsController extends Controller
         return [
             'properties' => Villa::approved()->count(),
             'bookings' => Booking::count(),
-            'years_experience' => (int) config('app.years_experience', 2),
+            'years_experience' => (int) config('app.years_experience', 1),
         ];
     }
 }

@@ -1,14 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
-import { loadHeroFrames } from './heroFrames';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import {
+    heroFramesReady, heroReadyProgress, startHeroFrames, subscribeHeroFrames, whenHeroFramesReady,
+} from './heroFrames';
 
-
-const MIN_MS = 700;   // durée minimale d'affichage (évite un flash quand tout est déjà en cache)
-const MAX_MS = 15000;  // sécurité : on entre dans le site quoi qu'il arrive
-const WEIGHTS = { logos: 2, hero: 5, fonts: 2 };
+const MIN_MS = 500;     // durée minimale d'affichage (évite un flash quand tout est déjà en cache)
+const MAX_MS = 15000;   // plafond absolu
+const STALL_MS = 6000;  // on n'abandonne que si RIEN n'avance depuis 6 s (réseau coupé, image manquante)
+const WEIGHTS = { logos: 1, fonts: 1, hero: 6 };
 const TOTAL = Object.values(WEIGHTS).reduce((a, b) => a + b, 0);
-
-const HERO = '/images/hero-villa.webp';
-
 
 // Charge ET décode une image : elle s'affichera ensuite sans saccade
 const loadImage = (src) =>
@@ -19,18 +19,23 @@ const loadImage = (src) =>
         else { img.onload = resolve; img.onerror = resolve; }
     });
 
-
-
 export default function Preloader() {
     const [done, setDone] = useState({});
     const [shown, setShown] = useState(0);
     const [phase, setPhase] = useState('loading'); // loading → leaving → gone
-    const [run, setRun] = useState(0);             // +1 à chaque relance (ex. après une connexion)
+    const [run, setRun] = useState(0);             // +1 à chaque relance (ex. connexion → accueil)
     const start = useRef(performance.now());
+    const lastProgress = useRef(performance.now()); // dernier moment où le chargement a avancé
     const target = useRef(0);
     const destination = useRef(window.location.pathname); // page vers laquelle on charge
+    const phaseRef = useRef(phase);
+    phaseRef.current = phase;
+    const { pathname } = useLocation();
 
-    const finish = (key, value = true) => setDone((d) => (d[key] === value ? d : { ...d, [key]: value }));
+    const finish = (key, value = true) => {
+        lastProgress.current = performance.now();
+        setDone((d) => (d[key] === value ? d : { ...d, [key]: value }));
+    };
 
     // Relance à la demande :
     //   window.dispatchEvent(new CustomEvent('preloader:show', { detail: { to: '/' } }))
@@ -38,6 +43,7 @@ export default function Preloader() {
         const onShow = (e) => {
             destination.current = e.detail?.to ?? window.location.pathname;
             start.current = performance.now();
+            lastProgress.current = performance.now();
             target.current = 0;
             setDone({});
             setShown(0);
@@ -48,48 +54,72 @@ export default function Preloader() {
         return () => window.removeEventListener('preloader:show', onShow);
     }, []);
 
-    // 1) Ressources du design de la page de destination (pas les villas : elles dépendent d'internet)
+    // Arrivée sur l'accueil alors que le lot minimal d'images n'est pas prêt (ex. on a démarré sur /login) :
+    // on réaffiche le preloader AVANT le premier affichage (layout effect) pour éviter tout flash de hero vide.
+    // Si le lot est déjà prêt (cas courant : il charge pendant qu'on est sur /login), rien ne s'affiche.
+    useLayoutEffect(() => {
+        if (pathname === '/' && phaseRef.current === 'gone' && !heroFramesReady()) {
+            window.dispatchEvent(new CustomEvent('preloader:show', { detail: { to: '/' } }));
+        }
+    }, [pathname]);
+
+    // Ressources de la page de destination
     useEffect(() => {
-        const path = destination.current;
-        const pageImage = path === '/' ? HERO : null;
+        startHeroFrames(); // toujours : sur /login, les images du hero chargent déjà en arrière-plan
+        const needsHero = destination.current === '/';
+        let unsub = () => {};
 
         Promise.all([loadImage('/images/logo-black.svg'), loadImage('/images/logo-white.svg')]).then(() => finish('logos'));
-        (pageImage ? Promise.all([loadImage(pageImage), loadHeroFrames((p) => finish('hero', p))]) : Promise.resolve()).then(() => finish('hero', true));
+
+        if (needsHero) {
+            finish('hero', heroReadyProgress());
+            unsub = subscribeHeroFrames(() => finish('hero', heroReadyProgress()));
+            whenHeroFramesReady().then(() => finish('hero', true));
+        } else {
+            finish('hero');
+        }
+
         (document.fonts
             ? Promise.all([document.fonts.load('16px "Manrope Variable"'), document.fonts.ready])
             : Promise.resolve()
         ).catch(() => {}).then(() => finish('fonts'));
 
+        return unsub;
     }, [run]);
 
-    // 2) Pourcentage réel visé
+    // Pourcentage réel visé
     target.current = (Object.entries(WEIGHTS).reduce((s, [k, w]) => s + w * (done[k] === true ? 1 : done[k] || 0), 0) / TOTAL) * 100;
 
-    // 3) Barre fluide : le pourcentage affiché rattrape progressivement le pourcentage réel
+    // Barre fluide : le pourcentage affiché rattrape vite le pourcentage réel
     const active = phase !== 'gone';
     useEffect(() => {
         if (!active) return;
         let raf;
         const tick = () => {
-            setShown((s) => Math.min(target.current, s + (target.current - s) * 0.12 + (target.current > s ? 0.15 : 0)));
+            setShown((s) => Math.min(target.current, s + (target.current - s) * 0.25 + (target.current > s ? 0.2 : 0)));
             raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf);
     }, [active]);
 
-    // 4) Sortie : 100 % atteint + durée minimale écoulée
+    // Sortie : 100 % atteint + durée minimale écoulée
     useEffect(() => {
-        if (phase !== 'loading' || shown < 99.9) return;
-        const wait = Math.max(0, MIN_MS - (performance.now() - start.current)) + 150;
+        if (phase !== 'loading' || shown < 99.5) return;
+        const wait = Math.max(0, MIN_MS - (performance.now() - start.current));
         const t = setTimeout(() => setPhase('leaving'), wait);
         return () => clearTimeout(t);
     }, [shown, phase]);
 
-    // Délai de sécurité (relancé à chaque run)
+    // Sécurité : on ne coupe PAS un chargement qui avance, seulement s'il est bloqué ou trop long
     useEffect(() => {
-        const t = setTimeout(() => setPhase((p) => (p === 'loading' ? 'leaving' : p)), MAX_MS);
-        return () => clearTimeout(t);
+        const t = setInterval(() => {
+            const now = performance.now();
+            if (now - lastProgress.current > STALL_MS || now - start.current > MAX_MS) {
+                setPhase((p) => (p === 'loading' ? 'leaving' : p));
+            }
+        }, 1000);
+        return () => clearInterval(t);
     }, [run]);
 
     useEffect(() => {

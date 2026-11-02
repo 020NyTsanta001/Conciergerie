@@ -16,6 +16,12 @@ class PricingService
     /** @param array<int, array{id:int, quantity?:int}> $serviceLines */
     public function quote(Villa $villa, Carbon $in, Carbon $out, array $serviceLines = []): array
     {
+        // durée maximale d'un séjour (config/booking.php) : refusée avant tout calcul
+        $max = (int) config('booking.max_nights');
+        if ((int) round(abs($in->diffInDays($out))) > $max) {
+            throw ValidationException::withMessages(['check_out' => "Un séjour dure {$max} nuits au maximum."]);
+        }
+
         $nights = [];
         $stay = 0.0;
 

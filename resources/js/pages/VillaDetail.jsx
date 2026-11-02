@@ -8,6 +8,7 @@ import { Stars } from '../components/Stars';
 // dates au format AAAA-MM-JJ en heure locale (toISOString donnerait la date UTC, parfois la veille)
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const addDays = (s, n) => { const d = new Date(`${s}T00:00:00`); d.setDate(d.getDate() + n); return iso(d); };
+const MAX_NIGHTS = window.__BOOKING__?.max_nights ?? 5; // vient de config/booking.php
 
 const field = 'rounded-xl border border-neutral-300 px-3 py-2.5 text-sm w-full outline-none focus:border-black';
 
@@ -96,15 +97,27 @@ export default function VillaDetail() {
                         className={field} type="date" aria-label="Arrivée" min={today} value={form.check_in}
                         onChange={(e) => {
                             const v = e.target.value;
-                            // si le départ n'est plus après la nouvelle arrivée, on le vide
-                            setForm({ ...form, check_in: v, check_out: form.check_out && form.check_out <= v ? '' : form.check_out });
+                            // le départ est vidé s'il n'est plus après l'arrivée, ou s'il dépasse la durée maximale
+                            const invalid = form.check_out && (form.check_out <= v || form.check_out > addDays(v, MAX_NIGHTS));
+                            setForm({ ...form, check_in: v, check_out: invalid ? '' : form.check_out });
                         }}
+
                     />
                     <input
-                        className={field} type="date" aria-label="Départ" min={addDays(form.check_in || today, 1)} value={form.check_out}
-                        onChange={(e) => setForm({ ...form, check_out: e.target.value })}
+                        className={field} type="date" aria-label="Départ"
+                        min={addDays(form.check_in || today, 1)}
+                        max={form.check_in ? addDays(form.check_in, MAX_NIGHTS) : undefined}
+                        value={form.check_out}
+                        onChange={(e) => {
+                            const v = e.target.value;
+                            const limit = form.check_in ? addDays(form.check_in, MAX_NIGHTS) : null;
+                            // une date saisie au-delà du maximum est ramenée à la dernière date autorisée
+                            setForm({ ...form, check_out: limit && v > limit ? limit : v });
+                        }}
                     />
+
                 </div>
+                <p className="-mt-2 text-xs text-neutral-500">Séjour de {MAX_NIGHTS} nuits maximum.</p>
                 <input className={field} type="number" min="1" max={villa.capacity} value={form.guests} onChange={(e) => setForm({ ...form, guests: e.target.value })} onBlur={() => setForm((f) => ({ ...f, guests: Math.min(Math.max(Number(f.guests) || 1, 1), villa.capacity) }))} />
                 {offered.length > 0 && (
                 <div>

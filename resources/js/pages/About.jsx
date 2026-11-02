@@ -3,11 +3,11 @@ import { useState } from 'react';
 /* ⚠️ À remplacer par tes vrais liens avant la mise en ligne */
 const CONTACT = {
     github: 'https://github.com/020NyTsanta001',
-    facebook: 'https://www.facebook.com/',          // ← ton lien Facebook
+    facebook: 'https://www.facebook.com/',          
     phone: '038 27 878 73',
-    email: 'nytsantaf@gmail.com',                 // ← ton adresse e-mail
+    email: 'nytsantaf@gmail.com',                 
 };
-const PHOTO = '/images/profile.jpg';                // même photo que la carte « À propos & Contact »
+const PHOTO = '/images/profile.webp';                
 const NAME = 'RABETOKOTANY Ny Tsanta Fiderana';
 
 const SKILLS = ['Laravel', 'PHP', 'React', 'Node.js / Express', 'MySQL', 'Tailwind CSS', 'API REST', 'Vite'];
