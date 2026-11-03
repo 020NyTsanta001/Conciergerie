@@ -7,3 +7,43 @@
 @layer base {
     body { font-family: var(--font-sans); }
 }
+
+/* ==========================================================================
+   BOUTONS : mini-soulèvement au survol, mini-clic à l'appui
+   Écrit HORS de @layer : ces règles priment sur les classes Tailwind.
+   Pour exclure un bouton, lui ajouter l'attribut  data-no-press
+   ========================================================================== */
+
+/* 1) Base : curseur « main » et transition douce (ease-out) */
+:is(button, [role='button'], a[href].rounded-full):not(:disabled, [aria-disabled='true'], [data-no-press], [role='menuitem']) {
+    cursor: pointer;
+    transition:
+        transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 220ms ease,
+        filter 220ms ease,
+        background-color 220ms ease,
+        color 220ms ease,
+        border-color 220ms ease,
+        opacity 220ms ease;
+}
+
+/* 2) Survol (souris seulement) : le bouton se soulève */
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+    :is(button, [role='button'], a[href].rounded-full):not(:disabled, [aria-disabled='true'], [data-no-press], [role='menuitem']):hover {
+        transform: translateY(-2px);
+    }
+    /* ombre douce seulement sur les boutons pleins ou à bordure, pas sur les simples textes cliquables */
+    :is(button[class*='bg-'], button[class*='border'], a[href].rounded-full):not(:disabled, [aria-disabled='true'], [data-no-press], [role='menuitem']):hover {
+        box-shadow: 0 8px 16px -8px rgb(0 0 0 / 0.35);
+    }
+}
+
+/* 3) Clic : le bouton s'enfonce vite ; au relâchement il revient en douceur */
+@media (prefers-reduced-motion: no-preference) {
+    :is(button, [role='button'], a[href].rounded-full):not(:disabled, [aria-disabled='true'], [data-no-press], [role='menuitem']):active {
+        transform: translateY(0) scale(0.96);
+        box-shadow: none;
+        filter: brightness(0.94);
+        transition-duration: 70ms;
+    }
+}

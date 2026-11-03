@@ -141,7 +141,7 @@ export default function YachtSection() {
                         <div className="mt-8 flex items-center gap-2">
                             {yachts.map((y, k) => (
                                 <button
-                                    key={y.villa_id}
+                                    key={y.villa_id} data-no-press
                                     onClick={() => goTo(k)}
                                     aria-label={`Yacht ${k + 1}`}
                                     className={`h-1.5 rounded-full transition-all duration-300 ${k === current ? 'w-8 bg-black' : 'w-3 bg-neutral-300 hover:bg-neutral-400'}`}
