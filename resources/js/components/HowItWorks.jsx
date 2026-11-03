@@ -49,6 +49,7 @@ export default function HowItWorks() {
             <div className="inline-flex rounded-full bg-neutral-100 p-1 text-sm font-medium">
                 {Object.entries(PROFILES).map(([key, v]) => (
                     <button
+                        data-no-press
                         key={key}
                         onClick={() => setTab(key)}
                         className={`rounded-full px-5 py-2 transition-colors ${tab === key ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'}`}

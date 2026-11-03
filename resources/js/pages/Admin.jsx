@@ -83,6 +83,7 @@ function PendingVillas() {
             <div className="mb-5 inline-flex rounded-full bg-neutral-100 p-1 max-w-full overflow-x-auto whitespace-nowrap text-xs font-medium">
                 {VILLA_STATUS.map(([key, label]) => (
                     <button
+                        data-no-press
                         key={key}
                         onClick={() => setStatus(key)}
                         className={`rounded-full px-4 py-1.5 transition-colors ${status === key ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'}`}
@@ -324,9 +325,10 @@ export default function Admin() {
         <div className="mx-auto max-w-5xl px-5 py-12">
             <h1 className="mb-6 text-4xl tracking-tight">Espace concierge</h1>
 
-            <div className="mb-8 grid grid-cols-3 gap-1 rounded-3xl bg-neutral-100 p-1 text-xs font-medium sm:grid-cols-6 sm:rounded-full md:text-sm">
+            <div data-no-press className="mb-8 grid grid-cols-3 gap-1 rounded-3xl bg-neutral-100 p-1 text-xs font-medium sm:grid-cols-6 sm:rounded-full md:text-sm">
                 {TABS.map(([key, label]) => (
                     <button
+                        data-no-press
                         key={key}
                         onClick={() => openTab(key)}
                         className={`rounded-full px-2 py-2.5 text-center transition-colors ${tab === key ? 'bg-black text-white' : 'text-neutral-600 hover:text-black'}`}
