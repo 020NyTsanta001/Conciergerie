@@ -103,7 +103,7 @@ abstract class TestCase extends BaseTestCase
         ];
     }
 
-    protected function status(User $actor, int $bookingId, string $action, array $extra = [])
+    protected function changeStatus(User $actor, int $bookingId, string $action, array $extra = [])
     {
         return $this->actingAs($actor, 'sanctum')->patchJson("/api/v1/bookings/{$bookingId}/status", ['action' => $action] + $extra);
     }
@@ -128,7 +128,7 @@ abstract class TestCase extends BaseTestCase
             ->postJson('/api/v1/bookings', $this->bookingPayload($villa, $fromDays, $nights))
             ->assertCreated()->json('data.id');
 
-        $this->status($host, $id, 'validate')->assertOk();
+        $this->changeStatus($host, $id, 'validate')->assertOk();
         $this->pay($client, $id, 'deposit')->assertOk();
 
         return compact('admin', 'host', 'client', 'villa', 'id');

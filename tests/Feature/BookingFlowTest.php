@@ -40,22 +40,22 @@ class BookingFlowTest extends TestCase
             ->postJson('/api/v1/bookings', $this->bookingPayload($villa, 10, 2, ['services' => [['id' => $s['chef']->id]]]))
             ->assertCreated()->json('data.id');
 
-        $this->status($host, $id, 'validate')->assertOk()->assertJsonPath('data.status', 'validated');
+        $this->changeStatus($host, $id, 'validate')->assertOk()->assertJsonPath('data.status', 'validated');
         $this->assertSame(1, $client->notifications()->count(), 'le voyageur est prévenu de l\'acceptation');
 
-        $this->pay($client, $id, 'deposit')->assertOk()->assertJsonPath('booking.data.status', 'deposit_paid')->assertJsonPath('amount', 75000);
+        $this->pay($client, $id, 'deposit')->assertOk()->assertJsonPath('booking.status', 'deposit_paid')->assertJsonPath('amount', 75000);
         $this->assertSame(925000, (int) $client->fresh()->balance);
         $this->assertSame(75000, (int) $host->fresh()->balance);
         $this->assertSame(0, (int) $admin->fresh()->balance);
 
-        $this->pay($client, $id, 'balance')->assertOk()->assertJsonPath('booking.data.status', 'balance_paid')->assertJsonPath('amount', 175000);
+        $this->pay($client, $id, 'balance')->assertOk()->assertJsonPath('booking.status', 'balance_paid')->assertJsonPath('amount', 175000);
         $this->assertSame(750000, (int) $client->fresh()->balance);
         $this->assertSame(212500, (int) $host->fresh()->balance);
         $this->assertSame(37500, (int) $admin->fresh()->balance);
         $this->assertDatabaseHas('payouts', ['booking_id' => $id, 'host_id' => $host->id, 'gross' => 250000, 'commission' => 37500, 'amount' => 212500]);
 
-        $this->status($host, $id, 'start')->assertOk()->assertJsonPath('data.status', 'in_progress');
-        $this->status($host, $id, 'close')->assertOk()->assertJsonPath('data.status', 'closed');
+        $this->changeStatus($host, $id, 'start')->assertOk()->assertJsonPath('data.status', 'in_progress');
+        $this->changeStatus($host, $id, 'close')->assertOk()->assertJsonPath('data.status', 'closed');
 
         $hostPayouts = $this->actingAs($host, 'sanctum')->getJson('/api/v1/host/payouts')->assertOk()->assertJsonCount(1, 'items');
         $this->assertEquals(212500, $hostPayouts->json('received'));
@@ -71,14 +71,14 @@ class BookingFlowTest extends TestCase
         $villa = $this->makeVilla($host);
 
         $id = $this->actingAs($client, 'sanctum')->postJson('/api/v1/bookings', $this->bookingPayload($villa))->json('data.id');
-        $this->status($host, $id, 'validate')->assertOk();
+        $this->changeStatus($host, $id, 'validate')->assertOk();
         $this->pay($client, $id, 'deposit')->assertOk(); // 200 000 : acompte 60 000, solde 140 000
 
-        $this->pay($client, $id, 'balance', 'on_site')->assertOk()->assertJsonPath('booking.data.balance_method', 'on_site')->assertJsonPath('booking.data.status', 'deposit_paid');
+        $this->pay($client, $id, 'balance', 'on_site')->assertOk()->assertJsonPath('booking.balance_method', 'on_site')->assertJsonPath('booking.status', 'deposit_paid');
         $this->assertSame(940000, (int) $client->fresh()->balance);
 
-        $this->status($client, $id, 'confirm_onsite')->assertForbidden();
-        $this->status($host, $id, 'confirm_onsite')->assertOk()->assertJsonPath('data.status', 'balance_paid');
+        $this->changeStatus($client, $id, 'confirm_onsite')->assertForbidden();
+        $this->changeStatus($host, $id, 'confirm_onsite')->assertOk()->assertJsonPath('data.status', 'balance_paid');
 
         // commission 30 000 prélevée chez l'hôte (60 000 - 30 000), créditée à la plateforme
         $this->assertSame(940000, (int) $client->fresh()->balance);
@@ -95,12 +95,12 @@ class BookingFlowTest extends TestCase
         $id = $this->actingAs($client, 'sanctum')->postJson('/api/v1/bookings', $this->bookingPayload($villa))->json('data.id');
 
         $this->pay($client, $id, 'deposit')->assertStatus(422);       // pas encore validée
-        $this->status($host, $id, 'validate')->assertOk();
+        $this->changeStatus($host, $id, 'validate')->assertOk();
         $this->pay($client, $id, 'balance')->assertStatus(422);       // acompte d'abord
-        $this->status($host, $id, 'start')->assertForbidden();        // solde non payé
+        $this->changeStatus($host, $id, 'start')->assertForbidden();        // solde non payé
         $this->pay($client, $id, 'deposit')->assertOk();
         $this->pay($client, $id, 'deposit')->assertStatus(422);       // pas deux fois
-        $this->status($host, $id, 'close')->assertForbidden();
+        $this->changeStatus($host, $id, 'close')->assertForbidden();
     }
 
     public function test_deposit_is_refused_when_the_wallet_is_too_low(): void
@@ -109,7 +109,7 @@ class BookingFlowTest extends TestCase
         $client = $this->fund($this->makeUser('client'), 1000);
         $villa = $this->makeVilla($host);
         $id = $this->actingAs($client, 'sanctum')->postJson('/api/v1/bookings', $this->bookingPayload($villa))->json('data.id');
-        $this->status($host, $id, 'validate')->assertOk();
+        $this->changeStatus($host, $id, 'validate')->assertOk();
 
         $this->pay($client, $id, 'deposit')->assertStatus(422)->assertJsonValidationErrors('balance');
 
@@ -140,7 +140,7 @@ class BookingFlowTest extends TestCase
         $id = $this->actingAs($first, 'sanctum')->postJson('/api/v1/bookings', $this->bookingPayload($villa))->assertCreated()->json('data.id');
         $this->actingAs($this->makeUser('client'), 'sanctum')->postJson('/api/v1/bookings', $this->bookingPayload($villa))->assertStatus(422);
 
-        $this->status($first, $id, 'cancel')->assertOk()->assertJsonPath('data.status', 'cancelled');
+        $this->changeStatus($first, $id, 'cancel')->assertOk()->assertJsonPath('data.status', 'cancelled');
 
         $this->actingAs($this->makeUser('client'), 'sanctum')->postJson('/api/v1/bookings', $this->bookingPayload($villa))->assertCreated();
     }
@@ -183,18 +183,18 @@ class BookingFlowTest extends TestCase
 
         // le propriétaire refuse une demande : le voyageur est prévenu
         $refused = $this->actingAs($client, 'sanctum')->postJson('/api/v1/bookings', $this->bookingPayload($villa, 10))->json('data.id');
-        $this->status($host, $refused, 'cancel')->assertOk()->assertJsonPath('data.status', 'cancelled');
+        $this->changeStatus($host, $refused, 'cancel')->assertOk()->assertJsonPath('data.status', 'cancelled');
         $this->assertSame(1, $client->notifications()->count());
 
         // après l'acompte, l'annulation simple n'existe plus (seule la demande de remboursement)
         $paid = $this->actingAs($client, 'sanctum')->postJson('/api/v1/bookings', $this->bookingPayload($villa, 20))->json('data.id');
-        $this->status($host, $paid, 'validate')->assertOk();
+        $this->changeStatus($host, $paid, 'validate')->assertOk();
         $this->pay($client, $paid, 'deposit')->assertOk();
-        $this->status($client, $paid, 'cancel')->assertForbidden();
-        $this->status($host, $paid, 'cancel')->assertForbidden();
+        $this->changeStatus($client, $paid, 'cancel')->assertForbidden();
+        $this->changeStatus($host, $paid, 'cancel')->assertForbidden();
 
         // l'admin consulte sans agir
-        $this->status($admin, $paid, 'cancel')->assertForbidden();
+        $this->changeStatus($admin, $paid, 'cancel')->assertForbidden();
     }
 
     public function test_each_profile_only_sees_its_own_bookings(): void
@@ -224,9 +224,9 @@ class BookingFlowTest extends TestCase
         $villa = $this->makeVilla($host);
         $id = $this->actingAs($client, 'sanctum')->postJson('/api/v1/bookings', $this->bookingPayload($villa))->json('data.id');
 
-        $this->status($client, $id, 'validate')->assertForbidden();
-        $this->status($otherHost, $id, 'validate')->assertForbidden();
-        $this->status($host, $id, 'validate')->assertOk();
+        $this->changeStatus($client, $id, 'validate')->assertForbidden();
+        $this->changeStatus($otherHost, $id, 'validate')->assertForbidden();
+        $this->changeStatus($host, $id, 'validate')->assertOk();
         $this->pay($stranger, $id, 'deposit')->assertForbidden();
     }
 
@@ -236,7 +236,7 @@ class BookingFlowTest extends TestCase
         $client = $this->makeUser('client');
         $id = $this->actingAs($client, 'sanctum')->postJson('/api/v1/bookings', $this->bookingPayload($this->makeVilla($host)))->json('data.id');
 
-        $this->status($host, $id, 'teleporter')->assertStatus(422)->assertJsonValidationErrors('action');
+        $this->changeStatus($host, $id, 'teleporter')->assertStatus(422)->assertJsonValidationErrors('action');
         $this->actingAs($client, 'sanctum')->postJson("/api/v1/bookings/{$id}/pay", ['type' => 'pourboire'])->assertStatus(422);
     }
 }
