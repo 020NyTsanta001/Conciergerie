@@ -3,6 +3,7 @@ import { api, eur, STATUS } from '../api';
 import { useAuth } from '../auth';
 import { useDots } from '../dots';
 import PayModal from '../components/PayModal';
+import { Link } from 'react-router-dom';
 
 const ACTIONS = {
     validate: ['Valider', 'bg-black text-white'],
@@ -142,9 +143,20 @@ export default function Bookings() {
             {notifs.length > 0 && (
                 <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm space-y-1">
                     <p className="font-semibold">Notifications</p>
-                    {notifs.slice(0, 8).map((n) => (
-                        <p key={n.id} className={n.read ? '' : 'font-semibold'}>• {n.message}</p>
-                    ))}
+                    {notifs.slice(0, 8).map((n) => {
+                        const tone = n.read ? 'text-neutral-500' : 'font-semibold text-neutral-900';
+                        return n.villa_id ? (
+                            <Link
+                                key={n.id}
+                                to={{ pathname: `/villas/${n.villa_id}`, hash: '#avis' }}
+                                className={`block cursor-pointer rounded-lg px-2 py-1 underline decoration-neutral-400 underline-offset-2 transition hover:bg-amber-100 hover:decoration-black ${tone}`}
+                            >
+                                • {n.message} <span aria-hidden>→</span>
+                            </Link>
+                        ) : (
+                            <p key={n.id} className={`px-2 py-1 ${tone}`}>• {n.message}</p>
+                        );
+                    })}
                 </div>
             )}
             {error && <p className="mb-4 text-sm text-rose-600">{error}</p>}

@@ -211,8 +211,8 @@ class BookingService
         if ($to === S::Closed) {
             // invitation à laisser un avis : point rouge « Réservations » chez le voyageur
             $b->user->notify(new InfoNotification(
-                "Votre séjour à « {$b->villa->title} » est terminé : vous pouvez laisser un avis sur la page de la villa.",
-                'bookings', $b->id
+                "Votre séjour à « {$b->villa->title} » est terminé : vous pouvez laisser un avis.",
+                'bookings', $b->id, $b->villa_id
             ));
         }
 

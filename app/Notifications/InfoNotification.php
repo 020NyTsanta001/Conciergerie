@@ -16,6 +16,7 @@ class InfoNotification extends Notification
         public string $message,
         public ?string $area = null,
         public ?int $bookingId = null,
+        public ?int $villaId = null,
     ) {}
 
     public function via(object $notifiable): array
@@ -25,6 +26,6 @@ class InfoNotification extends Notification
 
     public function toArray(object $notifiable): array
     {
-        return ['message' => $this->message, 'booking_id' => $this->bookingId, 'area' => $this->area];
+        return ['message' => $this->message, 'booking_id' => $this->bookingId, 'area' => $this->area, 'villa_id' => $this->villaId];
     }
 }

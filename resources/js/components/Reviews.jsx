@@ -19,6 +19,9 @@ export default function Reviews({ villaId, data, reload }) {
         api('/bookings')
             .then((r) => setEligible(r.data.find((b) => Number(b.villa.id) === Number(villaId) && b.status === 'closed' && !b.review) ?? null))
             .catch(() => {});
+        if (data && window.location.hash === '#avis') {
+        document.getElementById('avis')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
     }, [user?.id, villaId, data]);
 
     const submit = async (e) => {
@@ -46,7 +49,7 @@ export default function Reviews({ villaId, data, reload }) {
     const items = data?.items ?? [];
 
     return (
-        <div className="mt-10 border-t border-neutral-100 pt-6">
+        <div id="avis" className="mt-10 border-t border-neutral-100 pt-6">
             <h2 className="font-semibold">Avis des voyageurs</h2>
             {data?.count > 0 && (
                 <p className="mt-1 flex items-center gap-2 text-xs text-neutral-500">

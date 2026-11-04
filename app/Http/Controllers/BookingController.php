@@ -105,6 +105,6 @@ class BookingController extends Controller
     public function notifications(Request $request)
     {
         return $request->user()->notifications()->latest()->limit(30)->get()
-            ->map(fn ($n) => ['id' => $n->id, 'message' => $n->data['message'] ?? '', 'booking_id' => $n->data['booking_id'] ?? null, 'area' => $n->data['area'] ?? null, 'read' => (bool) $n->read_at, 'created_at' => $n->created_at]);
+            ->map(fn ($n) => ['id' => $n->id, 'message' => $n->data['message'] ?? '', 'booking_id' => $n->data['booking_id'] ?? null, 'villa_id' => $n->data['villa_id'] ?? null, 'area' => $n->data['area'] ?? null, 'read' => (bool) $n->read_at, 'created_at' => $n->created_at]);
     }
 }
