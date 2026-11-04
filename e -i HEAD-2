@@ -1,0 +1,5 @@
+[33m33baf49[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m Correction de test: renomme le heper status() en changeStatus() (methode final dans PHPUnit 12)
+[33me5df4dd[m Ajustement des animations boutons affectés, ajout de 2eme host seed, rectification et ajout de nouvelles test (mbol migebona)
+[33m4b82a2d[m Heroscroll stable, ajout de bouton dynamique
+[33mfb75c5f[m Ajout de ScrollTopButton qui fait remonter tout quand on atteint le plus bas
+[33m9bc50ad[m Ajout de limitation de sejour en 5 nuits max, amelioration de perf du heroscroll desktop et mobile (encore a rectifier)

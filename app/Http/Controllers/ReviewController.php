@@ -25,8 +25,8 @@ class ReviewController extends Controller
     private function row(Review $r): array
     {
         return [
-            'id' => $r->id,
-            'user_id' => $r->user_id,
+            'id' => (int) $r->id,
+            'user_id' => (int) $r->user_id,
             'author' => Str::words($r->user->name, 2, ''),
             'rating' => $r->rating,
             'comment' => $r->comment,

@@ -10,7 +10,7 @@ class Review extends Model
 
     protected function casts(): array
     {
-        return ['rating' => 'integer'];
+        return ['rating' => 'integer', 'user_id' => 'integer', 'villa_id' => 'integer', 'booking_id' => 'integer'];
     }
 
     public function user() { return $this->belongsTo(User::class); }

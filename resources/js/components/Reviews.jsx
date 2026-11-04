@@ -17,7 +17,7 @@ export default function Reviews({ villaId, data, reload }) {
     useEffect(() => {
         if (user?.role !== 'client') { setEligible(null); return; }
         api('/bookings')
-            .then((r) => setEligible(r.data.find((b) => b.villa.id === villaId && b.status === 'closed' && !b.review) ?? null))
+            .then((r) => setEligible(r.data.find((b) => Number(b.villa.id) === Number(villaId) && b.status === 'closed' && !b.review) ?? null))
             .catch(() => {});
     }, [user?.id, villaId, data]);
 
@@ -78,7 +78,7 @@ export default function Reviews({ villaId, data, reload }) {
             <ul className="mt-4 space-y-4">
                 {items.length === 0 && <li className="text-sm text-neutral-400">Aucun avis pour le moment.</li>}
                 {items.map((r) => {
-                    const mine = user?.id === r.user_id;
+                    const mine = user?.id && Number(user.id) === Number(r.user_id);
                     return (
                         <li key={r.id} className="text-sm">
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
