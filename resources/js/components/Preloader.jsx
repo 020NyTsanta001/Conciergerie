@@ -1,13 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
-    heroFramesReady, heroReadyProgress, startHeroFrames, subscribeHeroFrames, whenHeroFramesReady,
+    coverSrc, heroFramesReady, heroReadyProgress, startHeroFrames, subscribeHeroFrames, whenHeroFramesReady,
 } from './heroFrames';
 
-const MIN_MS = 500;     // durée minimale d'affichage (évite un flash quand tout est déjà en cache)
-const MAX_MS = 15000;   // plafond absolu
-const STALL_MS = 6000;  // on n'abandonne que si RIEN n'avance depuis 6 s (réseau coupé, image manquante)
-const WEIGHTS = { logos: 1, fonts: 1, hero: 6 };
+const MIN_MS = 500;   // durée minimale d'affichage (évite un flash quand tout est déjà en cache)
+// Aucun plafond de durée : le preloader attend que les 72 images soient chargées et décodées,
+// aussi lente que soit la connexion. Les erreurs sont gérées dans heroFrames.js (retentatives).
+const WEIGHTS = { logos: 1, fonts: 1, cover: 1, hero: 8 };
 const TOTAL = Object.values(WEIGHTS).reduce((a, b) => a + b, 0);
 
 // Charge ET décode une image : elle s'affichera ensuite sans saccade
@@ -24,8 +24,8 @@ export default function Preloader() {
     const [shown, setShown] = useState(0);
     const [phase, setPhase] = useState('loading'); // loading → leaving → gone
     const [run, setRun] = useState(0);             // +1 à chaque relance (ex. connexion → accueil)
+    const [offline, setOffline] = useState(typeof navigator !== 'undefined' && navigator.onLine === false);
     const start = useRef(performance.now());
-    const lastProgress = useRef(performance.now()); // dernier moment où le chargement a avancé
     const target = useRef(0);
     const destination = useRef(window.location.pathname); // page vers laquelle on charge
     const phaseRef = useRef(phase);
@@ -33,9 +33,17 @@ export default function Preloader() {
     const { pathname } = useLocation();
 
     const finish = (key, value = true) => {
-        lastProgress.current = performance.now();
         setDone((d) => (d[key] === value ? d : { ...d, [key]: value }));
     };
+
+    // Message si la connexion est coupée (le chargement reprend tout seul au retour du réseau)
+    useEffect(() => {
+        const on = () => setOffline(false);
+        const off = () => setOffline(true);
+        window.addEventListener('online', on);
+        window.addEventListener('offline', off);
+        return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+    }, []);
 
     // Relance à la demande :
     //   window.dispatchEvent(new CustomEvent('preloader:show', { detail: { to: '/' } }))
@@ -43,7 +51,6 @@ export default function Preloader() {
         const onShow = (e) => {
             destination.current = e.detail?.to ?? window.location.pathname;
             start.current = performance.now();
-            lastProgress.current = performance.now();
             target.current = 0;
             setDone({});
             setShown(0);
@@ -54,9 +61,9 @@ export default function Preloader() {
         return () => window.removeEventListener('preloader:show', onShow);
     }, []);
 
-    // Arrivée sur l'accueil alors que le lot minimal d'images n'est pas prêt (ex. on a démarré sur /login) :
+    // Arrivée sur l'accueil alors que les images ne sont pas toutes prêtes (ex. on a démarré sur /login) :
     // on réaffiche le preloader AVANT le premier affichage (layout effect) pour éviter tout flash de hero vide.
-    // Si le lot est déjà prêt (cas courant : il charge pendant qu'on est sur /login), rien ne s'affiche.
+    // Si elles sont déjà prêtes (cas courant : elles chargent pendant qu'on est sur /login), rien ne s'affiche.
     useLayoutEffect(() => {
         if (pathname === '/' && phaseRef.current === 'gone' && !heroFramesReady()) {
             window.dispatchEvent(new CustomEvent('preloader:show', { detail: { to: '/' } }));
@@ -72,10 +79,12 @@ export default function Preloader() {
         Promise.all([loadImage('/images/logo-black.svg'), loadImage('/images/logo-white.svg')]).then(() => finish('logos'));
 
         if (needsHero) {
+            loadImage(coverSrc()).then(() => finish('cover'));       // le hero-page net doit être prêt
             finish('hero', heroReadyProgress());
             unsub = subscribeHeroFrames(() => finish('hero', heroReadyProgress()));
-            whenHeroFramesReady().then(() => finish('hero', true));
+            whenHeroFramesReady().then(() => finish('hero', true));  // les 72 images chargées et décodées
         } else {
+            finish('cover');
             finish('hero');
         }
 
@@ -103,24 +112,13 @@ export default function Preloader() {
         return () => cancelAnimationFrame(raf);
     }, [active]);
 
-    // Sortie : 100 % atteint + durée minimale écoulée
+    // Sortie : 100 % atteint (toutes les images prêtes) + durée minimale écoulée
     useEffect(() => {
         if (phase !== 'loading' || shown < 99.5) return;
         const wait = Math.max(0, MIN_MS - (performance.now() - start.current));
         const t = setTimeout(() => setPhase('leaving'), wait);
         return () => clearTimeout(t);
     }, [shown, phase]);
-
-    // Sécurité : on ne coupe PAS un chargement qui avance, seulement s'il est bloqué ou trop long
-    useEffect(() => {
-        const t = setInterval(() => {
-            const now = performance.now();
-            if (now - lastProgress.current > STALL_MS || now - start.current > MAX_MS) {
-                setPhase((p) => (p === 'loading' ? 'leaving' : p));
-            }
-        }, 1000);
-        return () => clearInterval(t);
-    }, [run]);
 
     useEffect(() => {
         if (phase !== 'leaving') return;
@@ -149,7 +147,7 @@ export default function Preloader() {
                     <div className="h-full rounded-full bg-black" style={{ width: `${shown}%` }} />
                 </div>
                 <p className="mt-2 text-center text-[10px] uppercase tracking-[0.25em] text-neutral-500">
-                    Chargement… {Math.round(shown)} %
+                    {offline ? 'En attente de connexion…' : `Chargement… ${Math.round(shown)} %`}
                 </p>
             </div>
         </div>

@@ -28,6 +28,13 @@ function Protected({ roles, children }) {
     return children;
 }
 
+function GuestOnly({ children }){
+    const { user, ready } = useAuth();
+    if (!ready) return null;
+    if (user) return <Navigate to="/" replace />;
+    return children;
+}
+
 // Quand la monnaie du compte change, l'affichage est remonté : tous les prix se recalculent
 function MoneyBoundary({ children }) {
     const { user } = useAuth();
@@ -52,7 +59,8 @@ root.render(
                         <Route path="/" element={<Home />} />
                         <Route path="/villas" element={<Villas />} />
                         <Route path="/villas/:id" element={<VillaDetail />} />
-                        <Route path="/login" element={<Login />} />  
+                        <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} /> 
+                        <Route path="/register" element={<GuestOnly><Login initialMode="register" /></GuestOnly>} /> 
                         <Route path="/bookings" element={<Protected><Bookings /></Protected>} />
                         <Route path="/account" element={<Protected roles={['client', 'host']}><Account /></Protected>} />
                         <Route path="/host" element={<Protected roles={['host']}><Host /></Protected>} />

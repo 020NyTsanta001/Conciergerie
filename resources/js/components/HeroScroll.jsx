@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { FRAME_COUNT, getHeroFrames, setHeroFocus, startHeroFrames, subscribeHeroFrames } from './heroFrames';
+import { FRAME_COUNT, coverSrc, getHeroFrames, startHeroFrames, subscribeHeroFrames } from './heroFrames';
 
 /* ───────── RÉGLAGES ───────── */
 
@@ -20,6 +20,11 @@ const STEPS = [0.1, 0.3, 0.5, 0.7];
 
 /* ──────────────────────────── */
 
+// « Hero-page » : image nette affichée tant que le site n'a pas été touché (aucun défilement).
+// Dès le premier défilement elle disparaît pour de bon : la séquence d'images, derrière, prend le relais.
+let coverUsed = false;
+const COVER_FADE_MS = 350;
+
 const reveal = (on) =>
     `transition-all duration-700 ease-out ${on ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6 pointer-events-none'}`;
 
@@ -32,6 +37,9 @@ export default function HeroScroll({ stats }) {
     const canvas = useRef(null); // affichage de la séquence
     const [step, setStep] = useState(0);
     const [clicked, setClicked] = useState(false);
+    // 'on' = hero-page visible · 'fading' = fondu en cours · 'off' = disparu
+    const [cover, setCover] = useState(() => (!coverUsed && typeof window !== 'undefined' && window.scrollY < 2 ? 'on' : 'off'));
+    const [coverUrl] = useState(coverSrc);
 
     useIsoLayoutEffect(() => {
         const N = FRAME_COUNT;
@@ -60,6 +68,7 @@ export default function HeroScroll({ stats }) {
             const A = imgs[a];
             if (c.width !== A.naturalWidth) { c.width = A.naturalWidth; c.height = A.naturalHeight; }
             const ctx = c.getContext('2d');
+            ctx.imageSmoothingQuality = 'high';
             ctx.globalAlpha = 1;
             ctx.drawImage(A, 0, 0, c.width, c.height);
             if (b !== a) {
@@ -88,14 +97,17 @@ export default function HeroScroll({ stats }) {
             const p = total > 0 ? Math.min(1, Math.max(0, -r.top / total)) : 0;
 
             target = p * (N - 1);
-            setHeroFocus(Math.round(target)); // le chargement en arrière-plan suit le visiteur
             if (snap) { current = target; render(); } // affichage immédiat, sans attendre l'animation
             else if (!raf) raf = requestAnimationFrame(tick);
             setStep(STEPS.filter((s) => p >= s).length);
             setClicked(window.scrollY > 8);
         };
 
-        const onScroll = () => { if (!scrollRaf) scrollRaf = requestAnimationFrame(() => update()); };
+        const onScroll = () => {
+            // 1er défilement détecté : le hero-page disparaît, et ne reviendra pas
+            if (window.scrollY > 0 && !coverUsed) { coverUsed = true; setCover((c) => (c === 'on' ? 'fading' : c)); }
+            if (!scrollRaf) scrollRaf = requestAnimationFrame(() => update());
+        };
 
         // Redessine quand une nouvelle image arrive (utile si elle est proche de la position actuelle)
         const unsub = subscribeHeroFrames(() => { if (!raf) raf = requestAnimationFrame(tick); });
@@ -112,6 +124,13 @@ export default function HeroScroll({ stats }) {
             window.removeEventListener('resize', onScroll);
         };
     }, []);
+
+    // Fin du fondu : on retire l'image du DOM
+    useEffect(() => {
+        if (cover !== 'fading') return;
+        const t = setTimeout(() => setCover('off'), COVER_FADE_MS + 50);
+        return () => clearTimeout(t);
+    }, [cover]);
 
     // Défilement animé vers « Every Home Begins » ; la séquence suit puisqu'elle est pilotée par le scroll.
     const goToNext = () => {
@@ -147,6 +166,18 @@ export default function HeroScroll({ stats }) {
         <section id="hero" ref={box} className="relative -mt-24 bg-neutral-900" style={{ height: HERO_HEIGHT }}>
             <div ref={pin} className="sticky top-0 h-svh overflow-hidden bg-neutral-900">
                 <canvas ref={canvas} aria-hidden="true" className="absolute inset-0 h-full w-full object-cover" />
+                {/* hero-page : image nette devant la séquence tant que le site n'a pas été touché */}
+                {cover !== 'off' && (
+                    <img
+                        src={coverUrl}
+                        alt=""
+                        aria-hidden="true"
+                        decoding="sync"
+                        fetchPriority="high"
+                        className={`absolute inset-0 h-full w-full object-cover transition-opacity ease-out ${cover === 'fading' ? 'opacity-0' : 'opacity-100'}`}
+                        style={{ transitionDuration: `${COVER_FADE_MS}ms` }}
+                    />
+                )}
                 {/* voiles pour garder texte et header lisibles */}
                 <div className="absolute inset-0 bg-black/20" />
                 <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/50 to-transparent" />

@@ -4,10 +4,10 @@ import { useAuth } from '../auth';
 
 const field = 'w-full rounded-xl border border-neutral-300 px-4 py-3 text-sm outline-none focus:border-black';
 
-export default function Login() {
+export default function Login({ initialMode = 'login' }) {
     const { login, register } = useAuth();
     const nav = useNavigate();
-    const [mode, setMode] = useState('login');
+    const [mode, setMode] = useState(initialMode);
     const [f, setF] = useState({ name: '', email: '', password: '', role: 'client' });
     const [error, setError] = useState('');
     const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
