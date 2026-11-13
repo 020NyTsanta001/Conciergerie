@@ -5,6 +5,14 @@ import {
 } from './heroFrames';
 
 const MIN_MS = 500;   // durée minimale d'affichage (évite un flash quand tout est déjà en cache)
+const LEAVE_MS = 900; // durée du fondu de sortie : le site se révèle progressivement, sans coupure
+
+// Le hero-page apparaît en fondu derrière le chargement :
+//   0 % de visibilité jusqu'à HERO_FROM %, puis montée progressive jusqu'à HERO_MAX à HERO_TO %.
+// À la sortie, le fond blanc, le logo et la barre s'effacent : l'image continue de se révéler jusqu'à 100 %.
+const HERO_FROM = 60;
+const HERO_TO = 99;
+const HERO_MAX = 0.25;
 // Aucun plafond de durée : le preloader attend que les 72 images soient chargées et décodées,
 // aussi lente que soit la connexion. Les erreurs sont gérées dans heroFrames.js (retentatives).
 const WEIGHTS = { logos: 1, fonts: 1, cover: 1, hero: 8 };
@@ -72,14 +80,14 @@ export default function Preloader() {
 
     // Ressources de la page de destination
     useEffect(() => {
-        startHeroFrames(); // toujours : sur /login, les images du hero chargent déjà en arrière-plan
         const needsHero = destination.current === '/';
         let unsub = () => {};
+        if (needsHero) loadImage(coverSrc()).then(() => finish('cover')); // demandé avant les 72 images
+        startHeroFrames(); // toujours : sur /login, les images du hero chargent déjà en arrière-plan
 
         Promise.all([loadImage('/images/logo-black.svg'), loadImage('/images/logo-white.svg')]).then(() => finish('logos'));
 
         if (needsHero) {
-            loadImage(coverSrc()).then(() => finish('cover'));       // le hero-page net doit être prêt
             finish('hero', heroReadyProgress());
             unsub = subscribeHeroFrames(() => finish('hero', heroReadyProgress()));
             whenHeroFramesReady().then(() => finish('hero', true));  // les 72 images chargées et décodées
@@ -122,7 +130,7 @@ export default function Preloader() {
 
     useEffect(() => {
         if (phase !== 'leaving') return;
-        const t = setTimeout(() => setPhase('gone'), 600); // = durée du fondu
+        const t = setTimeout(() => setPhase('gone'), LEAVE_MS); // = durée du fondu
         return () => clearTimeout(t);
     }, [phase]);
 
@@ -135,20 +143,45 @@ export default function Preloader() {
 
     if (phase === 'gone') return null;
 
+    const leaving = phase === 'leaving';
+    const showHero = destination.current === '/';
+    const heroOpacity = showHero ? HERO_MAX * Math.min(1, Math.max(0, (shown - HERO_FROM) / (HERO_TO - HERO_FROM))) : 0;
+
     return (
-        <div
-            className={`fixed inset-0 z-[100] flex flex-col items-center justify-center gap-5 bg-white transition-opacity duration-500 ${
-                phase === 'leaving' ? 'pointer-events-none opacity-0' : 'opacity-100'
-            }`}
-        >
-            <img src="/images/logo-black.svg" alt="Hoxen" className="h-14 w-auto md:h-16" />
-            <div className="w-1/3 md:w-2/5">
-                <div className="h-[3px] w-full overflow-hidden rounded-full bg-neutral-200">
-                    <div className="h-full rounded-full bg-black" style={{ width: `${shown}%` }} />
+        <div className={`fixed inset-0 z-[100] ${leaving ? 'pointer-events-none' : ''}`}>
+            {/* fond : blanc + hero-page qui apparaît avec l'avancement ; il s'efface en douceur à la sortie */}
+            <div
+                className="absolute inset-0 bg-white transition-opacity ease-in-out"
+                style={{ opacity: leaving ? 0 : 1, transitionDuration: `${LEAVE_MS}ms` }}
+            >
+                {showHero && (
+                    <img
+                        src={coverSrc()}
+                        alt=""
+                        aria-hidden="true"
+                        decoding="async"
+                        fetchPriority="high"
+                        // même cadrage que le hero (h-svh, object-cover) : l'image ne bouge pas quand le chargement se termine
+                        className="absolute inset-x-0 top-0 h-svh w-full object-cover"
+                        style={{ opacity: heroOpacity }}
+                    />
+                )}
+            </div>
+
+            {/* logo + barre : ils partent plus vite que le fond */}
+            <div
+                className="relative flex h-full flex-col items-center justify-center gap-5 transition-opacity duration-300"
+                style={{ opacity: leaving ? 0 : 1 }}
+            >
+                <img src="/images/logo-black.svg" alt="Hoxen" className="h-14 w-auto md:h-16" />
+                <div className="w-1/3 md:w-2/5">
+                    <div className="h-[3px] w-full overflow-hidden rounded-full bg-neutral-200">
+                        <div className="h-full rounded-full bg-black" style={{ width: `${shown}%` }} />
+                    </div>
+                    <p className="mt-2 text-center text-[10px] uppercase tracking-[0.25em] text-neutral-500">
+                        {offline ? 'En attente de connexion…' : `Chargement… ${Math.round(shown)} %`}
+                    </p>
                 </div>
-                <p className="mt-2 text-center text-[10px] uppercase tracking-[0.25em] text-neutral-500">
-                    {offline ? 'En attente de connexion…' : `Chargement… ${Math.round(shown)} %`}
-                </p>
             </div>
         </div>
     );
